@@ -440,11 +440,8 @@ void owl_log_incoming(owl_message *m)
     if (strcmp(owl_message_get_opcode(m), "")) fprintf(file, " Opcode: %s", owl_message_get_opcode(m));
     fprintf(file, "\n");
     fprintf(file, "Time: %s Host: %s\n", owl_message_get_timestr(m), owl_message_get_hostname(m));
-    ptr=owl_zephyr_get_zsig(owl_message_get_notice(m), &i);
-    buff=owl_malloc(i+10);
-    memcpy(buff, ptr, i);
-    buff[i]='\0';
-    fprintf(file, "From: %s <%s>\n\n", buff, tmp);
+    ptr=owl_message_get_zsig(m);
+    fprintf(file, "From: %s <%s>\n\n", ptr, tmp);
     fprintf(file, "%s\n\n", owl_message_get_body(m));
     owl_free(tmp);
   } else if (owl_message_is_type_aim(m) && !owl_message_is_loginout(m)) {

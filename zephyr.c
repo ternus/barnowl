@@ -580,20 +580,6 @@ void owl_zephyr_zaway(owl_message *m)
 #endif
 }
 
-#ifdef HAVE_LIBZEPHYR
-void owl_zephyr_hackaway_cr(ZNotice_t *n)
-{
-  /* replace \r's with ' '.  Gross-ish */
-  int i;
-
-  for (i=0; i<n->z_message_len; i++) {
-    if (n->z_message[i]=='\r') {
-      n->z_message[i]=' ';
-    }
-  }
-}
-#endif
-
 void owl_zephyr_zlocate(char *user, char *out, int auth)
 {
 #ifdef HAVE_LIBZEPHYR

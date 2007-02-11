@@ -61,11 +61,14 @@
 
 /* Perl and curses don't play nice. */
 #ifdef OWL_PERL
+/* Squelch a warning because both perl and libfaim define bool*/
+#undef bool
 typedef void WINDOW;
 #include <perl.h>
 #include "XSUB.h"
 #else
 typedef void SV;
+typedef void HV;
 #endif
 
 static const char owl_h_fileIdent[] = "$Id$";
@@ -323,18 +326,9 @@ typedef struct _owl_pair {
 
 typedef struct _owl_message {
   int id;
-  int direction;
-#ifdef HAVE_LIBZEPHYR
-  ZNotice_t notice;
-#endif
   owl_fmtext fmtext;              /* this is now only a CACHED copy */
   int invalid_format;             /* indicates whether fmtext needs to be regenerated */
-  int delete;
-  char *hostname;
-  owl_list attributes;            /* this is a list of pairs */
-  char *timestr;
-  time_t time;
-  char *zwriteline;
+  HV * attributes;
 } owl_message;
 
 typedef struct _owl_style {

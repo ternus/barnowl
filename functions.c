@@ -1597,7 +1597,7 @@ void owl_function_info()
     if (owl_message_is_direction_in(m)) {
       char *ptr, tmpbuff[1024];
       int i, j, fields, len;
-
+      /*
       n=owl_message_get_notice(m);
 
       if (!owl_message_is_pseudo(m)) {
@@ -1624,11 +1624,13 @@ void owl_function_info()
 	  owl_fmtext_append_normal(&fm, "ILLEGAL VALUE\n");
 	}
       }
+      */
       owl_fmtext_append_normal(&fm, "  Host      : ");
       owl_fmtext_append_normal(&fm, owl_message_get_hostname(m));
 
       if (!owl_message_is_pseudo(m)) {
-	owl_fmtext_append_normal(&fm, "\n");
+        owl_fmtext_append_normal(&fm, "\n");
+        /*
 	sprintf(buff, "  Port      : %i\n", ntohs(n->z_port));
 	owl_fmtext_append_normal(&fm, buff);
 
@@ -1636,21 +1638,20 @@ void owl_function_info()
 	owl_fmtext_append_normal(&fm, owl_zephyr_get_authstr(n));
 	owl_fmtext_append_normal(&fm, "\n");
 	
-	/* fix this */
 	sprintf(buff, "  Checkd Ath: %i\n", n->z_checked_auth);
 	sprintf(buff, "%s  Multi notc: %s\n", buff, n->z_multinotice);
 	sprintf(buff, "%s  Num other : %i\n", buff, n->z_num_other_fields);
 	sprintf(buff, "%s  Msg Len   : %i\n", buff, n->z_message_len);
 	owl_fmtext_append_normal(&fm, buff);
-	
-	sprintf(buff, "  Fields    : %i\n", owl_zephyr_get_num_fields(n));
+      */	
+	sprintf(buff, "  Fields    : %i\n", owl_message_get_num_fields(m));
 	owl_fmtext_append_normal(&fm, buff);
 	
-	fields=owl_zephyr_get_num_fields(n);
+	fields=owl_message_get_num_fields(m);
 	for (i=0; i<fields; i++) {
 	  sprintf(buff, "  Field %i   : ", i+1);
 	  
-	  ptr=owl_zephyr_get_field(n, i+1);
+	  ptr=owl_message_get_field(m, i+1);
 	  len=strlen(ptr);
 	  if (len<30) {
 	    strncpy(tmpbuff, ptr, len);
@@ -1671,8 +1672,8 @@ void owl_function_info()
 	  strcat(buff, "\n");
 	  owl_fmtext_append_normal(&fm, buff);
 	}
-	owl_fmtext_append_normal(&fm, "  Default Fm:");
-	owl_fmtext_append_normal(&fm, n->z_default_format);
+	/* owl_fmtext_append_normal(&fm, "  Default Fm:");
+           owl_fmtext_append_normal(&fm, n->z_default_format); */
       }
       
     }
