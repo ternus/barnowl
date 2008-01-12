@@ -8,6 +8,7 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <time.h>
+#define OWL_PERL
 #include "owl.h"
 
 static const char fileIdent[] = "$Id$";
@@ -16,24 +17,48 @@ static owl_fmtext_cache fmtext_cache[OWL_FMTEXT_CACHE_SIZE];
 static owl_fmtext_cache * fmtext_cache_next = fmtext_cache;
 
 owl_message *owl_message_new() {
-  return (owl_message*)owl_malloc(sizeof(owl_message));
+  dSP;
+  SV *msg;
+  int count;
+
+  ENTER;
+  SAVETMPS;
+
+  PUSHMARK(SP);
+  XPUSHs(sv_2mortal(newSVpv("BarnOwl::Message", 0)));
+  PUTBACK;
+
+  count = call_method("new", G_SCALAR|G_EVAL);
+
+  SPAGAIN;
+
+  if (SvTRUE(ERRSV)) {
+    printf("Ooops: %s\n", SvPV_nolen(ERRSV));
+    exit(-1);
+  }
+
+  msg = POPs;
+  SvREFCNT_inc(msg);
+
+  PUTBACK;
+  FREETMPS;
+  LEAVE;
+
+  return (owl_message*)msg;
 }
 
 void owl_message_init(owl_message *m)
 {
-  m->id=owl_global_get_nextmsgid(&g);
-  owl_message_set_direction_none(m);
-  m->delete=0;
 
-  owl_message_set_hostname(m, "");
-  owl_list_create(&(m->attributes));
-  
-  /* save the time */
-  m->time=time(NULL);
-  m->timestr=owl_strdup(ctime(&(m->time)));
-  m->timestr[strlen(m->timestr)-1]='\0';
+}
 
-  m->fmtext = NULL;
+SV* owl_message_get_attribute_internal(owl_message *m, char *attrname)
+{
+  HV * hash = (HV*)SvRV((SV*)m);
+  SV **attr = hv_fetch(hash, attrname, strlen(attrname), 0);
+  if(attr == NULL)
+    return NULL;
+  return *attr;
 }
 
 /* add the named attribute to the message.  If an attribute with the
@@ -41,26 +66,9 @@ void owl_message_init(owl_message *m)
  */
 void owl_message_set_attribute(owl_message *m, char *attrname, char *attrvalue)
 {
-  int i, j;
-  owl_pair *p = NULL, *pair = NULL;
-
-  /* look for an existing pair with this key, */
-  j=owl_list_get_size(&(m->attributes));
-  for (i=0; i<j; i++) {
-    p=owl_list_get_element(&(m->attributes), i);
-    if (!strcmp(owl_pair_get_key(p), attrname)) {
-      owl_free(owl_pair_get_value(p));
-      pair = p;
-      break;
-    }
-  }
-
-  if(pair ==  NULL) {
-    pair = owl_malloc(sizeof(owl_pair));
-    owl_pair_create(pair, owl_global_intern(&g, attrname), NULL);
-    owl_list_append_element(&(m->attributes), pair);
-  }
-  owl_pair_set_value(pair, owl_validate_or_convert(attrvalue));
+  char *argv[] = {attrname, attrvalue, NULL};
+  char *rv = owl_perlconfig_message_call_method(m, "__set_attribute", 2, argv);
+  if(rv) owl_free(rv);
 }
 
 /* return the value associated with the named attribute, or NULL if
@@ -68,52 +76,28 @@ void owl_message_set_attribute(owl_message *m, char *attrname, char *attrvalue)
  */
 char *owl_message_get_attribute_value(owl_message *m, char *attrname)
 {
-  int i, j;
-  owl_pair *p;
-
-  j=owl_list_get_size(&(m->attributes));
-  for (i=0; i<j; i++) {
-    p=owl_list_get_element(&(m->attributes), i);
-    if (!strcmp(owl_pair_get_key(p), attrname)) {
-      return(owl_pair_get_value(p));
-    }
-  }
-
-  /*
-  owl_function_debugmsg("No attribute %s found for message %i",
-			attrname,
-			owl_message_get_id(m));
-  */
-  return(NULL);
+  SV *attr = owl_message_get_attribute_internal(m, attrname);
+  if(attr == NULL || !SvOK(attr)) return NULL;
+  return SvPV_nolen(attr);
 }
 
-/* We cheat and indent it for now, since we really want this for
- * the 'info' function.  Later there should just be a generic
- * function to indent fmtext.
- */
-void owl_message_attributes_tofmtext(owl_message *m, owl_fmtext *fm) {
-  int i, j;
-  owl_pair *p;
-  char *buff;
+char *owl_message_get_attribute_value_nonull(owl_message *m, char *attrname)
+{
+  char *att = owl_message_get_attribute_value(m, attrname);
+  if(att == NULL) return "";
+  return att;
+}
 
-  owl_fmtext_init_null(fm);
-
-  j=owl_list_get_size(&(m->attributes));
-  for (i=0; i<j; i++) {
-    p=owl_list_get_element(&(m->attributes), i);
-    buff=owl_sprintf("  %-15.15s: %-35.35s\n", owl_pair_get_key(p), owl_pair_get_value(p));
-    if(buff == NULL) {
-      buff=owl_sprintf("  %-15.15s: %-35.35s\n", owl_pair_get_key(p), "<error>");
-      if(buff == NULL)
-        buff=owl_strdup("   <error>\n");
-    }
-    owl_fmtext_append_normal(fm, buff);
-    owl_free(buff);
-  }
+int owl_message_get_attribute_int(owl_message *m, char *attrname)
+{
+  SV* attr = owl_message_get_attribute_internal(m, attrname);
+  if(attr == NULL)
+    return 0;
+  return SvIV(attr);
 }
 
 int owl_message_get_id(owl_message *m) {
-  return m->id;
+  return owl_message_get_attribute_int(m, "id");
 }
 
 void owl_message_set_class(owl_message *m, char *class)
@@ -275,47 +259,98 @@ int owl_message_is_logout(owl_message *m)
 
 void owl_message_set_isprivate(owl_message *m)
 {
-  owl_message_set_attribute(m, "isprivate", "true");
+  owl_message_set_attribute(m, "private", "true");
 }
 
 int owl_message_is_private(owl_message *m)
 {
   char *res;
 
-  res=owl_message_get_attribute_value(m, "isprivate");
+  res=owl_message_get_attribute_value(m, "private");
   if (!res) return(0);
   return !strcmp(res, "true");
 }
 
+/*
+  A note on times: For backwards compatibility with owl, we store the
+  ``timestr'' (ctime) under the ``time'' key in the has, and the
+  numeric time as ``_time''. Setting the numeric time automatically
+  recomputes the timestr.
+ */
+void owl_message_set_time(owl_message *m, time_t tm)
+{
+  char * timestr;
+  timestr = owl_sprintf("%d", tm);
+  owl_message_set_attribute(m, "_time", timestr);
+  owl_free(timestr);
+  timestr = owl_strdup(ctime(&tm));
+  /* Chop the newline */
+  timestr[strlen(timestr)-1] = 0;
+  owl_message_set_attribute(m, "time", timestr);
+  owl_free(timestr);
+}
+
+time_t owl_message_get_time(owl_message *m)
+{
+  return (time_t)owl_message_get_attribute_int(m, "_time");
+}
+
 char *owl_message_get_timestr(owl_message *m)
 {
-  if (m->timestr) return(m->timestr);
-  return("");
+  char *tm = owl_message_get_attribute_value(m, "time");
+  if(tm == NULL) return "";
+  return tm;
+}
+
+/* caller must free the return */
+char *owl_message_get_shorttimestr(owl_message *m)
+{
+  struct tm *tmstruct;
+  time_t time = owl_message_get_time(m);
+  char *out;
+
+  tmstruct=localtime(&time);
+  out=owl_sprintf("%2.2i:%2.2i", tmstruct->tm_hour, tmstruct->tm_min);
+  if (out) return(out);
+  return("??:??");
 }
 
 void owl_message_set_type_admin(owl_message *m)
 {
-  owl_message_set_attribute(m, "type", "admin");
+  owl_message_set_type(m, "admin");
 }
 
 void owl_message_set_type_loopback(owl_message *m)
 {
-  owl_message_set_attribute(m, "type", "loopback");
+  owl_message_set_type(m, "loopback");
 }
 
 void owl_message_set_type_zephyr(owl_message *m)
 {
-  owl_message_set_attribute(m, "type", "zephyr");
+  owl_message_set_type(m, "zephyr");
 }
 
 void owl_message_set_type_aim(owl_message *m)
 {
-  owl_message_set_attribute(m, "type", "AIM");
+  owl_message_set_type(m, "AIM");
 }
 
 void owl_message_set_type(owl_message *m, char* type)
 {
+  char *blessas;
+  HV *stash;
   owl_message_set_attribute(m, "type", type);
+  type = owl_strdup(type);
+  type[0] = toupper(type[0]);
+  blessas = owl_sprintf("BarnOwl::Message::%s", type);
+  stash = gv_stashpv(blessas, 0);
+  if(!stash) {
+    owl_function_error("No such class: %s for message type %s", blessas, owl_message_get_type(m));
+    stash = gv_stashpv("BarnOwl::Message", 1);
+  }
+  sv_bless(m, stash);
+  owl_free(type);
+  owl_free(blessas);
 }
 
 int owl_message_is_type(owl_message *m, char *type) {
@@ -358,59 +393,54 @@ int owl_message_is_pseudo(owl_message *m)
 
 void owl_message_set_direction_in(owl_message *m)
 {
-  m->direction=OWL_MESSAGE_DIRECTION_IN;
+  owl_message_set_direction(m, OWL_MESSAGE_DIRECTION_IN);
 }
 
 void owl_message_set_direction_out(owl_message *m)
 {
-  m->direction=OWL_MESSAGE_DIRECTION_OUT;
+  owl_message_set_direction(m, OWL_MESSAGE_DIRECTION_OUT);
 }
 
 void owl_message_set_direction_none(owl_message *m)
 {
-  m->direction=OWL_MESSAGE_DIRECTION_NONE;
+  owl_message_set_direction(m, OWL_MESSAGE_DIRECTION_NONE);
 }
 
-void owl_message_set_direction(owl_message *m, int direction)
+void owl_message_set_direction(owl_message *m, char *direction)
 {
-  m->direction=direction;
+  owl_message_set_attribute(m, "direction", direction);
 }
 
 int owl_message_is_direction_in(owl_message *m)
 {
-  if (m->direction==OWL_MESSAGE_DIRECTION_IN) return(1);
-  return(0);
+  return !strcmp(owl_message_get_direction(m), OWL_MESSAGE_DIRECTION_IN);
 }
 
 int owl_message_is_direction_out(owl_message *m)
 {
-  if (m->direction==OWL_MESSAGE_DIRECTION_OUT) return(1);
-  return(0);
+  return !strcmp(owl_message_get_direction(m), OWL_MESSAGE_DIRECTION_OUT);
 }
 
 int owl_message_is_direction_none(owl_message *m)
 {
-  if (m->direction==OWL_MESSAGE_DIRECTION_NONE) return(1);
-  return(0);
+  return !strcmp(owl_message_get_direction(m), OWL_MESSAGE_DIRECTION_NONE);
 }
 
 void owl_message_mark_delete(owl_message *m)
 {
   if (m == NULL) return;
-  m->delete=1;
+  owl_message_set_attribute(m, "deleted", "1");
 }
 
 void owl_message_unmark_delete(owl_message *m)
 {
   if (m == NULL) return;
-  m->delete=0;
+  owl_message_set_attribute(m, "deleted", "0");
 }
 
 char *owl_message_get_zwriteline(owl_message *m)
 {
-  char *z = owl_message_get_attribute_value(m, "zwriteline");
-  if (!z) return "";
-  return z;
+  return owl_message_get_attribute_value_nonull(m, "zwriteline");
 }
 
 void owl_message_set_zwriteline(owl_message *m, char *line)
@@ -421,30 +451,17 @@ void owl_message_set_zwriteline(owl_message *m, char *line)
 int owl_message_is_delete(owl_message *m)
 {
   if (m == NULL) return(0);
-  if (m->delete==1) return(1);
-  return(0);
+  return owl_message_get_attribute_int(m, "deleted");
 }
-
-#ifdef HAVE_LIBZEPHYR
-ZNotice_t *owl_message_get_notice(owl_message *m) /*noproto*/
-{
-  return(&(m->notice));
-}
-#else
-void *owl_message_get_notice(owl_message *m) /*noproto*/
-{
-  return(NULL);
-}
-#endif
 
 void owl_message_set_hostname(owl_message *m, char *hostname)
 {
-  m->hostname=owl_global_intern(&g, hostname);
+  owl_message_set_attribute(m, "hostname", hostname);
 }
 
 char *owl_message_get_hostname(owl_message *m)
 {
-  return(m->hostname);
+  return owl_message_get_attribute_value_nonull(m, "hostname");
 }
 
 int owl_message_is_personal(owl_message *m)
@@ -550,28 +567,10 @@ char *owl_message_get_type(owl_message *m) {
 }
 
 char *owl_message_get_direction(owl_message *m) {
-  switch (m->direction) {
-  case OWL_MESSAGE_DIRECTION_IN:
-    return("in");
-  case OWL_MESSAGE_DIRECTION_OUT:
-    return("out");
-  case OWL_MESSAGE_DIRECTION_NONE:
-    return("none");
-  default:
-    return("unknown");
-  }
+  char *dir =  owl_message_get_attribute_value(m, "direction");
+  if(dir == NULL) return "unknown";
+  return dir;
 }
-
-int owl_message_parse_direction(char *d) {
-  if(!strcmp(d, "in")) {
-    return OWL_MESSAGE_DIRECTION_IN;
-  } else if(!strcmp(d, "out")) {
-    return OWL_MESSAGE_DIRECTION_OUT;
-  } else {
-    return OWL_MESSAGE_DIRECTION_NONE;
-  }
-}
-
 
 char *owl_message_get_login(owl_message *m) {
   if (owl_message_is_login(m)) {
@@ -602,7 +601,7 @@ int owl_message_search(owl_message *m, char *string)
  *                 0 it's not a login/logout message
  *                 1 it's a login message
  */
-void owl_message_create_aim(owl_message *m, char *sender, char *recipient, char *text, int direction, int loginout)
+void owl_message_create_aim(owl_message *m, char *sender, char *recipient, char *text, char *direction, int loginout)
 {
   owl_message_init(m);
   owl_message_set_body(m, text);
@@ -610,11 +609,7 @@ void owl_message_create_aim(owl_message *m, char *sender, char *recipient, char 
   owl_message_set_recipient(m, recipient);
   owl_message_set_type_aim(m);
 
-  if (direction==OWL_MESSAGE_DIRECTION_IN) {
-    owl_message_set_direction_in(m);
-  } else if (direction==OWL_MESSAGE_DIRECTION_OUT) {
-    owl_message_set_direction_out(m);
-  }
+  owl_message_set_direction(m, direction);
 
   /* for now all messages that aren't loginout are private */
   if (!loginout) {
@@ -652,24 +647,14 @@ void owl_message_create_from_znotice(owl_message *m, ZNotice_t *n)
 {
   struct hostent *hent;
   char *ptr, *tmp, *tmp2;
-  int len;
+  int i,j,len;
 
   owl_message_init(m);
   
   owl_message_set_type_zephyr(m);
   owl_message_set_direction_in(m);
-  
-  /* first save the full notice */
-  memcpy(&(m->notice), n, sizeof(ZNotice_t));
 
-  /* a little gross, we'll replace \r's with ' ' for now */
-  owl_zephyr_hackaway_cr(&(m->notice));
-  
-  /* save the time, we need to nuke the string saved by message_init */
-  if (m->timestr) owl_free(m->timestr);
-  m->time=n->z_time.tv_sec;
-  m->timestr=owl_strdup(ctime(&(m->time)));
-  m->timestr[strlen(m->timestr)-1]='\0';
+  owl_message_set_time(m, n->z_time.tv_sec);
 
   /* set other info */
   owl_message_set_sender(m, n->z_sender);
@@ -742,6 +727,21 @@ void owl_message_create_from_znotice(owl_message *m, ZNotice_t *n)
   }
   owl_free(tmp);
 
+  /* Save the fields */
+  AV *av_zfields;
+
+  av_zfields = newAV();
+  j=owl_zephyr_get_num_fields(n);
+  for (i=0; i<j; i++) {
+    ptr=owl_zephyr_get_field(n, i+1);
+    av_push(av_zfields, newSVpvn(ptr, strlen(ptr)));
+    owl_free(ptr);
+  }
+  hv_store((HV*)SvRV(m), "fields", strlen("fields"), newRV_noinc((SV*)av_zfields), 0);
+
+  /* Auth */
+  owl_message_set_attribute(m, "auth", owl_zephyr_get_authstr(n));
+
 #ifdef OWL_ENABLE_ZCRYPT
   /* if zcrypt is enabled try to decrypt the message */
   if (owl_global_is_zcrypt(&g) && !strcasecmp(n->z_opcode, "crypt")) {
@@ -761,12 +761,26 @@ void owl_message_create_from_znotice(owl_message *m, ZNotice_t *n)
 
 int owl_message_get_num_fields(owl_message *m)
 {
-  return owl_zephyr_get_num_fields(owl_message_get_notice(m));
+  SV * ref_fields;
+  AV * fields;
+  ref_fields = owl_message_get_attribute_internal(m, "fields");
+  if(!ref_fields || !SvROK(ref_fields)) return 0;
+  fields = (AV*)(SvRV(ref_fields));
+  return av_len(fields) + 1;
 }
 
 char *owl_message_get_field(owl_message *m, int n)
 {
-  return owl_zephyr_get_field(owl_message_get_notice(m), n);
+  n--;
+  SV * ref_fields;
+  AV * fields;
+  SV ** f;
+  ref_fields = owl_message_get_attribute_internal(m, "fields");
+  if(!ref_fields || !SvROK(ref_fields)) return "";
+  fields = (AV*)SvRV(ref_fields);
+  f = av_fetch(fields, n, 0);
+  if(!f) return "";
+  return owl_strdup(SvPV_nolen(*f));
 }
 #else
 void owl_message_create_from_znotice(owl_message *m, void *n)
@@ -779,10 +793,6 @@ void owl_message_create_pseudo_zlogin(owl_message *m, int direction, char *user,
 {
   char *longuser, *ptr;
 
-#ifdef HAVE_LIBZEPHYR
-  memset(&(m->notice), 0, sizeof(ZNotice_t));
-#endif
-  
   longuser=long_zuser(user);
   
   owl_message_init(m);
@@ -868,26 +878,8 @@ void owl_message_create_from_zwriteline(owl_message *m, char *line, char *body, 
 
 void owl_message_free(owl_message *m)
 {
-  int i, j;
-  owl_pair *p;
-#ifdef HAVE_LIBZEPHYR    
-  if (owl_message_is_type_zephyr(m) && owl_message_is_direction_in(m)) {
-    ZFreeNotice(&(m->notice));
-  }
-#endif
-  if (m->timestr) owl_free(m->timestr);
-
-  /* free all the attributes */
-  j=owl_list_get_size(&(m->attributes));
-  for (i=0; i<j; i++) {
-    p=owl_list_get_element(&(m->attributes), i);
-    owl_free(owl_pair_get_value(p));
-    owl_free(p);
-  }
-
-  owl_list_free_simple(&(m->attributes));
- 
   owl_message_invalidate_format(m);
+  SvREFCNT_dec((SV*)m);
 }
 
 
@@ -921,19 +913,29 @@ void owl_message_invalidate_format(owl_message *m)
   owl_fmtext_cache * fmtext = owl_message_get_fmtext_cache(m);
   if(fmtext) {
     fmtext->message_id = NO_MESSAGE;
-    owl_fmtext_clear(&(m->fmtext->fmtext));
+    owl_fmtext_clear(&(fmtext->fmtext));
     owl_message_set_fmtext_cache(m, NULL);
   }
 }
 
 owl_fmtext_cache *owl_message_get_fmtext_cache(owl_message *m)
 {
-  return m->fmtext;
+  SV *fmtext = owl_message_get_attribute_internal(m, "__fmtext");
+  if(fmtext && SvROK(fmtext)) {
+    int fm_which = SvIV(SvRV(fmtext));
+    if(fm_which >= 0 && fm_which < OWL_FMTEXT_CACHE_SIZE) {
+      return fmtext_cache + fm_which;
+    }
+  }
+  return NULL;
 }
 
 void owl_message_set_fmtext_cache(owl_message *m, owl_fmtext_cache *fm)
 {
-  m->fmtext = fm;
+  SV *fmtext = newSV(0);
+  sv_setref_iv(fmtext, Nullch, (fm - fmtext_cache));
+  HV *hash = (HV*)SvRV((SV*)m);
+  hv_store(hash, "__fmtext", strlen("__fmtext"), fmtext, 0);
 }
 
 owl_fmtext *owl_message_get_fmtext(owl_message *m)
@@ -992,3 +994,14 @@ void owl_message_curs_waddstr(owl_message *m, WINDOW *win, int aline, int bline,
   owl_fmtext_free(&a);
   owl_fmtext_free(&b);
 }
+
+void owl_message_attributes_tofmtext(owl_message *m, owl_fmtext *fm) {
+  owl_fmtext_init_null(fm);
+
+  char *text = owl_perlconfig_message_call_method(m, "__format_attributes", 0, NULL);
+
+  owl_fmtext_append_normal(fm, text);
+
+  owl_free(text);
+}
+

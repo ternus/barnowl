@@ -107,9 +107,9 @@ static const char owl_h_fileIdent[] = "$Id$";
 #define OWL_PROTOCOL_YAHOO          4
 #define OWL_PROTOCOL_MSN            5
 
-#define OWL_MESSAGE_DIRECTION_NONE  0
-#define OWL_MESSAGE_DIRECTION_IN    1
-#define OWL_MESSAGE_DIRECTION_OUT   2
+#define OWL_MESSAGE_DIRECTION_NONE  "none"
+#define OWL_MESSAGE_DIRECTION_IN    "in"
+#define OWL_MESSAGE_DIRECTION_OUT   "out"
 
 #define OWL_MUX_READ   1
 #define OWL_MUX_WRITE  2
@@ -325,20 +325,7 @@ typedef struct _owl_pair {
 
 struct _owl_fmtext_cache;
 
-// typedef SV owl_message;
-typedef struct _owl_message {
-  int id;
-  int direction;
-#ifdef HAVE_LIBZEPHYR
-  ZNotice_t notice;
-#endif
-  struct _owl_fmtext_cache * fmtext;
-  int delete;
-  char *hostname;
-  owl_list attributes;            // this is a list of pairs 
-  char *timestr;
-  time_t time;
-} owl_message;
+typedef SV owl_message;
 
 #define OWL_FMTEXT_CACHE_SIZE 1000
 /* We cache the saved fmtexts for the last bunch of messages we

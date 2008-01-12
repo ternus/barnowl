@@ -25,91 +25,7 @@ static void owl_perl_xs_init(pTHX)
 
 SV *owl_perlconfig_message2hashref(owl_message *m)
 {
-  HV *h, *stash;
-  SV *hr;
-  char *ptr, *blessas, *type;
-  int i, j;
-  owl_pair *pair;
-  owl_filter *wrap;
-
-  if (!m) return &PL_sv_undef;
-  wrap = owl_global_get_filter(&g, "wordwrap");
-  if(!wrap) {
-      owl_function_error("wrap filter is not defined");
-      return &PL_sv_undef;
-  }
-
-  h = newHV();
-
-#define MSG2H(h,field) (void)hv_store(h, #field, strlen(#field),        \
-                                      newSVpv(owl_message_get_##field(m),0), 0)
-
-  if (owl_message_is_type_zephyr(m)
-      && owl_message_is_direction_in(m)) {
-    /* Handle zephyr-specific fields... */
-    AV *av_zfields;
-
-    av_zfields = newAV();
-    j=owl_zephyr_get_num_fields(owl_message_get_notice(m));
-    for (i=0; i<j; i++) {
-      ptr=owl_zephyr_get_field_as_utf8(owl_message_get_notice(m), i+1);
-      av_push(av_zfields, newSVpvn(ptr, strlen(ptr)));
-      owl_free(ptr);
-    }
-    (void)hv_store(h, "fields", strlen("fields"), newRV_noinc((SV*)av_zfields), 0);
-
-    (void)hv_store(h, "auth", strlen("auth"), 
-                   newSVpv(owl_zephyr_get_authstr(owl_message_get_notice(m)),0),0);
-  }
-
-  j=owl_list_get_size(&(m->attributes));
-  for(i=0; i<j; i++) {
-    pair=owl_list_get_element(&(m->attributes), i);
-    (void)hv_store(h, owl_pair_get_key(pair), strlen(owl_pair_get_key(pair)),
-                   newSVpv(owl_pair_get_value(pair),0),0);
-  }
-  
-  MSG2H(h, type);
-  MSG2H(h, direction);
-  MSG2H(h, class);
-  MSG2H(h, instance);
-  MSG2H(h, sender);
-  MSG2H(h, realm);
-  MSG2H(h, recipient);
-  MSG2H(h, opcode);
-  MSG2H(h, hostname);
-  MSG2H(h, body);
-  MSG2H(h, login);
-  MSG2H(h, zsig);
-  MSG2H(h, zwriteline);
-  if (owl_message_get_header(m)) {
-    MSG2H(h, header); 
-  }
-  (void)hv_store(h, "time", strlen("time"), newSVpv(owl_message_get_timestr(m),0),0);
-  (void)hv_store(h, "unix_time", strlen("unix_time"), newSViv(m->time), 0);
-  (void)hv_store(h, "id", strlen("id"), newSViv(owl_message_get_id(m)),0);
-  (void)hv_store(h, "deleted", strlen("deleted"), newSViv(owl_message_is_delete(m)),0);
-  (void)hv_store(h, "private", strlen("private"), newSViv(owl_message_is_private(m)),0);
-  (void)hv_store(h, "should_wordwrap",
-                 strlen("should_wordwrap"), newSViv(
-                                                    owl_filter_message_match(wrap, m)),0);
-
-  type = owl_message_get_type(m);
-  if(!type || !*type) type = "generic";
-  type = owl_strdup(type);
-  type[0] = toupper(type[0]);
-  blessas = owl_sprintf("BarnOwl::Message::%s", type);
-
-  hr = newRV_noinc((SV*)h);
-  stash =  gv_stashpv(blessas,0);
-  if(!stash) {
-    owl_function_error("No such class: %s for message type %s", blessas, owl_message_get_type(m));
-    stash = gv_stashpv("BarnOwl::Message", 1);
-  }
-  hr = sv_bless(hr,stash);
-  owl_free(type);
-  owl_free(blessas);
-  return hr;
+  return (SV*)m;
 }
 
 SV *owl_perlconfig_curmessage2hashref(void) /*noproto*/
@@ -124,75 +40,9 @@ SV *owl_perlconfig_curmessage2hashref(void) /*noproto*/
   return owl_perlconfig_message2hashref(owl_view_get_element(v, curmsg));
 }
 
-/* XXX TODO: Messages should round-trip properly between
-   message2hashref and hashref2message. Currently we lose
-   zephyr-specific properties stored in the ZNotice_t
-
-   This has been somewhat addressed, but is still not lossless.
- */
 owl_message * owl_perlconfig_hashref2message(SV *msg)
 {
-  owl_message * m;
-  HE * ent;
-  I32 count, len;
-  char *key,*val;
-  HV * hash;
-  struct tm tm;
-
-  hash = (HV*)SvRV(msg);
-
-  m = owl_message_new();
-  owl_message_init(m);
-
-  count = hv_iterinit(hash);
-  while((ent = hv_iternext(hash))) {
-    key = hv_iterkey(ent, &len);
-    val = SvPV_nolen(hv_iterval(hash, ent));
-    if(!strcmp(key, "type")) {
-      owl_message_set_type(m, val);
-    } else if(!strcmp(key, "direction")) {
-      owl_message_set_direction(m, owl_message_parse_direction(val));
-    } else if(!strcmp(key, "private")) {
-      SV * v = hv_iterval(hash, ent);
-      if(SvTRUE(v)) {
-        owl_message_set_isprivate(m);
-      }
-    } else if (!strcmp(key, "hostname")) {
-      owl_message_set_hostname(m, val);
-    } else if (!strcmp(key, "zwriteline")) {
-      owl_message_set_zwriteline(m, val);
-    } else if (!strcmp(key, "time")) {
-      m->timestr = owl_strdup(val);
-      strptime(val, "%a %b %d %T %Y", &tm);
-      m->time = mktime(&tm);
-    } else {
-      owl_message_set_attribute(m, key, val);
-    }
-  }
-  if(owl_message_is_type_admin(m)) {
-    if(!owl_message_get_attribute_value(m, "adminheader"))
-      owl_message_set_attribute(m, "adminheader", "");
-  }
-#ifdef HAVE_LIBZEPHYR
-  if (owl_message_is_type_zephyr(m)) {
-    ZNotice_t *n = &(m->notice);
-    n->z_kind = ACKED;
-    n->z_port = 0;
-    n->z_auth = ZAUTH_NO;
-    n->z_checked_auth = 0;
-    n->z_class = owl_message_get_class(m);
-    n->z_class_inst = owl_message_get_instance(m);
-    n->z_opcode = owl_message_get_opcode(m);
-    n->z_sender = owl_message_get_sender(m);
-    n->z_recipient = owl_message_get_recipient(m);
-    n->z_default_format = "[zephyr created from perl]";
-    n->z_multinotice = "[zephyr created from perl]";
-    n->z_num_other_fields = 0;
-    n->z_message = owl_sprintf("%s%c%s", owl_message_get_zsig(m), '\0', owl_message_get_body(m));
-    n->z_message_len = strlen(owl_message_get_zsig(m)) + strlen(owl_message_get_body(m)) + 1;
-  }
-#endif
-  return m;
+  return (owl_message*)SvREFCNT_inc(msg);
 }
 
 /* Calls in a scalar context, passing it a hash reference.
@@ -212,7 +62,7 @@ char *owl_perlconfig_call_with_message(char *subname, owl_message *m)
   XPUSHs(sv_2mortal(msgref));
   PUTBACK ;
   
-  count = call_pv(subname, G_SCALAR|G_EVAL|G_KEEPERR);
+  count = call_pv(subname, G_SCALAR|G_EVAL);
   
   SPAGAIN ;
 
@@ -265,7 +115,7 @@ char * owl_perlconfig_message_call_method(owl_message *m, char *method, int argc
   }
   PUTBACK;
 
-  count = call_method(method, G_SCALAR|G_KEEPERR|G_EVAL);
+  count = call_method(method, G_SCALAR|G_EVAL);
 
   SPAGAIN;
 
@@ -498,7 +348,7 @@ void owl_perlconfig_edit_callback(owl_editwin *e)
   XPUSHs(sv_2mortal(text));
   PUTBACK;
   
-  call_sv(cb, G_DISCARD|G_KEEPERR|G_EVAL);
+  call_sv(cb, G_DISCARD|G_EVAL);
 
   if(SvTRUE(ERRSV)) {
     owl_function_error("%s", SvPV_nolen(ERRSV));

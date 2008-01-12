@@ -9,13 +9,52 @@ use BarnOwl::Message::Generic;
 use BarnOwl::Message::Loopback;
 use BarnOwl::Message::Zephyr;
 
+use POSIX qw(ctime);
+
+my $__next_id;
+$__next_id = 1 unless defined($__next_id);
+
 sub new {
     my $class = shift;
-    my %args = (@_);
+    my $time = time;
+    my $timestr = ctime($time);
+    $timestr =~ s/\n$//;
+    my %args = (
+        id        => $__next_id++,
+        deleted   => 0,
+        time      => $timestr,
+        _time     => $time,
+        direction => 'none',
+        @_);
+    if(exists $args{loginout} && !exists $args{login}) {
+        $args{login} = $args{loginout};
+        delete $args{loginout};
+    }
     if($class eq __PACKAGE__ && $args{type}) {
         $class = "BarnOwl::Message::" . ucfirst $args{type};
     }
     return bless {%args}, $class;
+}
+
+sub __set_attribute {
+    my $self = shift;
+    my $attr = shift;
+    my $val  = shift;
+    $self->{$attr} = $val;
+}
+
+sub __format_attributes {
+    my $self = shift;
+    my %skip = map {$_ => 1} qw(_time fields id deleted __fmtext type);
+    my $text = "";
+    my @keys = sort keys %$self;
+    for my $k (@keys) {
+        my $v = $self->{$k};
+        unless($skip{$k}) {
+            $text .= sprintf("  %-15.15s: %-35.35s\n", $k, $v);
+        }
+    }
+    return $text;
 }
 
 sub type        { return shift->{"type"}; }
@@ -26,7 +65,7 @@ sub id          { return shift->{"id"}; }
 sub body        { return shift->{"body"}; }
 sub sender      { return shift->{"sender"}; }
 sub recipient   { return shift->{"recipient"}; }
-sub login       { return shift->{"login"}; }
+sub login       { return shift->{"login"} || ""; }
 sub is_private  { return shift->{"private"}; }
 
 sub is_login    { return shift->login eq "login"; }
