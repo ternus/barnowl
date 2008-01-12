@@ -1324,7 +1324,7 @@ void owl_zephyr_process_events(owl_dispatch *d) {
       }
 
       /* create the new message */
-      m=owl_malloc(sizeof(owl_message));
+      m=owl_message_new();
       owl_message_create_from_znotice(m, &notice);
 
       owl_global_messagequeue_addmsg(&g, m);
