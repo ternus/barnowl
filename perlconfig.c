@@ -30,14 +30,11 @@ SV *owl_perlconfig_message2hashref(owl_message *m)
 
 SV *owl_perlconfig_curmessage2hashref(void) /*noproto*/
 {
-  int curmsg;
-  owl_view *v;
-  v=owl_global_get_current_view(&g);
-  if (owl_view_get_size(v) < 1) {
+  owl_message *m = owl_global_get_current_message(&g);
+  if(m == NULL) {
     return &PL_sv_undef;
   }
-  curmsg=owl_global_get_curmsg(&g);
-  return owl_perlconfig_message2hashref(owl_view_get_element(v, curmsg));
+  return owl_perlconfig_message2hashref(m);
 }
 
 owl_message * owl_perlconfig_hashref2message(SV *msg)

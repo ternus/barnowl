@@ -1411,16 +1411,11 @@ void owl_function_info()
 {
   owl_message *m;
   owl_fmtext fm, attrfm;
-  owl_view *v;
-#ifdef HAVE_LIBZEPHYR
-  ZNotice_t *n;
-#endif
 
   owl_fmtext_init_null(&fm);
   
-  v=owl_global_get_current_view(&g);
-  m=owl_view_get_element(v, owl_global_get_curmsg(&g));
-  if (!m || owl_view_get_size(v)==0) {
+  m=owl_global_get_current_message(&g);
+  if (!m) {
     owl_function_error("No message selected\n");
     return;
   }
@@ -1554,18 +1549,16 @@ void owl_function_info()
 void owl_function_curmsg_to_popwin()
 {
   owl_popwin *pw;
-  owl_view *v;
   owl_message *m;
   owl_style *s;
   owl_fmtext fm;
 
-  v=owl_global_get_current_view(&g);
   s=owl_global_get_style_by_name(&g, "default");
   pw=owl_global_get_popwin(&g);
 
-  m=owl_view_get_element(v, owl_global_get_curmsg(&g));
+  m = owl_global_get_current_message(&g);
 
-  if (!m || owl_view_get_size(v)==0) {
+  if (!m) {
     owl_function_error("No current message");
     return;
   }
@@ -1902,7 +1895,7 @@ void owl_function_reply(int type, int enter)
     owl_function_error("No message selected");
   } else {
     
-    m=owl_view_get_element(owl_global_get_current_view(&g), owl_global_get_curmsg(&g));
+    m = owl_global_get_current_message(&g);
     if (!m) {
       owl_function_error("No message selected");
       return;
@@ -2590,15 +2583,13 @@ void owl_function_delete_curview_msgs(int flag)
  */
 char *owl_function_smartfilter(int type)
 {
-  owl_view *v;
   owl_message *m;
   char *zperson, *filtname=NULL;
   char *argv[1];
   
-  v=owl_global_get_current_view(&g);
-  m=owl_view_get_element(v, owl_global_get_curmsg(&g));
+  m = owl_global_get_current_message(&g);
 
-  if (!m || owl_view_get_size(v)==0) {
+  if (!m) {
     owl_function_error("No message selected\n");
     return(NULL);
   }
@@ -2662,14 +2653,12 @@ void owl_function_smartzpunt(int type)
 {
   /* Starts a zpunt command based on the current class,instance pair. 
    * If type=0, uses just class.  If type=1, uses instance as well. */
-  owl_view *v;
   owl_message *m;
   char *cmd, *cmdprefix, *mclass, *minst;
   
-  v=owl_global_get_current_view(&g);
-  m=owl_view_get_element(v, owl_global_get_curmsg(&g));
+  m = owl_global_get_current_message(&g);
 
-  if (!m || owl_view_get_size(v)==0) {
+  if (!m) {
     owl_function_error("No message selected\n");
     return;
   }
