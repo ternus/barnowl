@@ -432,3 +432,27 @@ void owl_perlconfig_perl_timer_destroy(owl_timer *t)
     SvREFCNT_dec((SV*)t->data);
   }
 }
+
+SV * owl_perl_new(char *class)
+{
+  SV *obj;
+  OWL_PERL_CALL_METHOD(sv_2mortal(newSVpv(class, 0)), "new",
+                       // No args
+                       ,
+                       "Error in perl: %s\n",
+                       1,
+                       obj = POPs;
+                       SvREFCNT_inc(obj);
+                       );
+  return obj;
+}
+
+void owl_perl_savetmps() {
+  ENTER;
+  SAVETMPS;
+}
+
+void owl_perl_freetmps() {
+  FREETMPS;
+  LEAVE;
+}

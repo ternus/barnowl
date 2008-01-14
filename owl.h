@@ -366,10 +366,7 @@ typedef struct _owl_popwin {
   int needsfirstrefresh;
 } owl_popwin;
 
-typedef struct _owl_messagelist {
-  owl_list list;
-  int iterator;
-} owl_messagelist;
+typedef SV owl_messagelist;
 
 typedef struct _owl_regex {
   int negate;
@@ -527,7 +524,7 @@ typedef struct _owl_global {
   int markedmsgid;              /* for finding the marked message when it has moved. */
   int curmsg_vert_offset;
   owl_view current_view;
-  owl_messagelist msglist;
+  owl_messagelist *msglist;
   WINDOW *recwin, *sepwin, *msgwin, *typwin;
   int needrefresh;
   int rightshift;

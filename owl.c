@@ -235,6 +235,9 @@ int main(int argc, char **argv, char **env)
     exit(1);
   }
 
+  /* Now that we have perl, we can initialize the msssage list*/
+  g.msglist = owl_messagelist_new();
+
   /* setup the default filters */
   /* the personal filter will need to change again when AIM chat's are
    *  included.  Also, there should be an %aimme% */
@@ -367,6 +370,8 @@ int main(int argc, char **argv, char **env)
   /* main loop */
   while (1) {
 
+    owl_perl_savetmps();
+
     /* if a resize has been scheduled, deal with it */
     owl_global_resize(&g, 0, 0);
 
@@ -470,6 +475,8 @@ int main(int argc, char **argv, char **env)
 			   si.si_code, si.si_band, si.si_errno);
       }
     }
+
+    owl_perl_freetmps();
 
   }
 }
