@@ -368,6 +368,7 @@ typedef struct _owl_popwin {
 
 typedef struct _owl_messagelist {
   owl_list list;
+  int iterator;
 } owl_messagelist;
 
 typedef struct _owl_regex {
