@@ -116,6 +116,7 @@ void owl_global_init(owl_global *g) {
   owl_list_create(&(g->dispatchlist));
   g->timerlist = NULL;
   g->interrupted = FALSE;
+  g->fmtext_seq = 0;
 }
 
 void _owl_global_setup_windows(owl_global *g) {
@@ -969,4 +970,21 @@ void owl_global_set_interrupted(owl_global *g) {
 
 void owl_global_unset_interrupted(owl_global *g) {
   g->interrupted = 0;
+}
+
+/*
+ * The fmtext_seq is used to manage the fmtext cache for
+ * messages. Whenever we initialize a cache, we save the global seq in
+ * the cache. Whenever we change styles, we increment the global
+ * seq. Caches are checked to ensure that their sequence number
+ * matches the global sequence whenever they are used.
+ */
+int owl_global_get_fmtext_seq(owl_global *g)
+{
+    return g->fmtext_seq;
+}
+
+void owl_global_next_fmtext_seq(owl_global *g)
+{
+    g->fmtext_seq++;
 }

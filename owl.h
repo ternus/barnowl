@@ -331,8 +331,9 @@ typedef SV owl_message;
 /* We cache the saved fmtexts for the last bunch of messages we
    rendered */
 typedef struct _owl_fmtext_cache {
-    int message_id;
-    owl_fmtext fmtext;
+  int message_id;
+  int seq;
+  owl_fmtext fmtext;
 } owl_fmtext_cache;
 
 typedef struct _owl_style {
@@ -583,6 +584,7 @@ typedef struct _owl_global {
   owl_timer *aim_nop_timer;
   int load_initial_subs;
   int interrupted;
+  int fmtext_seq;          /* Used to invalidate message fmtext caches */
 } owl_global;
 
 /* globals */
