@@ -18,6 +18,7 @@ use BarnOwl::Message;
 use BarnOwl::Style;
 use BarnOwl::Timer;
 use BarnOwl::MessageList;
+use BarnOwl::View;
 
 =head1 NAME
 
