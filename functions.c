@@ -1155,7 +1155,7 @@ void owl_function_calculate_topmsg_normal(int direction, owl_view *v, owl_view_i
 
   /* If we're off the top of the screen then center */
   if (owl_view_iterator_cmp(curmsg, topmsg) < 0) {
-    owl_view_iterator_init_start(topmsg, v);
+      owl_view_iterator_clone(topmsg, curmsg);
     owl_function_calculate_topmsg_center(direction, v, curmsg, topmsg, recwinlines);
   }
 
@@ -1751,6 +1751,10 @@ void owl_function_delete_automsgs()
   owl_view_iterator *it;
   owl_view *v;
   owl_filter *f;
+
+  owl_function_error("Trash command temporarily broken");
+  return;
+  
   it = owl_view_iterator_free_later(owl_view_iterator_new());
 
   /* get the trash filter */
@@ -2546,6 +2550,9 @@ void owl_function_delete_curview_msgs(int flag)
   owl_message *m;
   int count = 0;
 
+  owl_function_error("Unsupported");
+  return;
+
   it = owl_view_iterator_free_later(owl_view_iterator_new());
 
   v=owl_global_get_current_view(&g);
@@ -3178,6 +3185,9 @@ void owl_function_dump(char *filename)
   owl_view_iterator *it;
   FILE *file;
   char *plaintext;
+
+  owl_function_error("Unsupported");
+  return;
 
   it = owl_view_iterator_free_later(owl_view_iterator_new());
   v = owl_global_get_current_view(&g);
