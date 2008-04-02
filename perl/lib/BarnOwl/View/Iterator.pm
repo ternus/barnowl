@@ -5,6 +5,10 @@ package BarnOwl::View::Iterator;
 
 sub view {return shift->{view}}
 sub index {return shift->{index}}
+sub eff_index {
+    my $self = shift;
+    return $self->index + $self->view->offset;
+}
 
 sub new {
     my $class = shift;
@@ -26,13 +30,15 @@ sub initialize_at_start {
     my $view = shift;
     $self->{view}  = $view;
     $self->{index} = 0;
+    $view->recalculate_around(0);
 }
 
 sub initialize_at_end {
     my $self = shift;
     my $view = shift;
     $self->{view}  = $view;
-    $self->{index} = $self->view->_size - 1;
+    $self->{index} = 0;
+    $view->recalculate_around(-1);
 }
 
 sub initialize_at_id {
@@ -40,8 +46,8 @@ sub initialize_at_id {
     my $view = shift;
     my $id   = shift;
     $self->{view} = $view;
-    my $list = $self->view->messages;
-    $self->{index} = BarnOwl::MessageList::binsearch($list, $id, sub{shift->id});
+    $self->{index} = 0;
+    $view->recalculate_around($id);
 }
 
 sub clone {
@@ -53,21 +59,25 @@ sub clone {
 
 sub has_prev {
     my $self = shift;
+    $self->fill_back;
     return $self->index > 0;
 }
 
 sub has_next {
     my $self = shift;
+    $self->fill_forward;
     return $self->index < $self->view->_size - 1;
 }
 
 sub at_start {
     my $self = shift;
+    $self->fill_back;
     return $self->index < 0;
 }
 
 sub at_end {
     my $self = shift;
+    $self->fill_forward;
     return $self->index >= $self->view->_size;
 }
 
@@ -91,7 +101,21 @@ sub next {
 
 sub get_message {
     my $self = shift;
-    return $self->view->messages->[$self->index];
+    return $self->view->messages->[$self->eff_index];
+}
+
+sub fill_back {
+    my $self = shift;
+    if($self->eff_index == 0) {
+        $self->view->fill_back;
+    }
+}
+
+sub fill_forward {
+    my $self = shift;
+    if($self->eff_index == (scalar @{$self->view->messages}) - 1) {
+        $self->view->fill_forward;
+    }
 }
 
 sub cmp {
