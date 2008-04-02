@@ -60,25 +60,25 @@ sub clone {
 sub has_prev {
     my $self = shift;
     $self->fill_back;
-    return $self->index > 0;
+    return $self->eff_index > 0;
 }
 
 sub has_next {
     my $self = shift;
     $self->fill_forward;
-    return $self->index < $self->view->_size - 1;
+    return $self->eff_index < scalar @{$self->view->messages} - 1;
 }
 
 sub at_start {
     my $self = shift;
     $self->fill_back;
-    return $self->index < 0;
+    return $self->eff_index < 0;
 }
 
 sub at_end {
     my $self = shift;
     $self->fill_forward;
-    return $self->index >= $self->view->_size;
+    return $self->eff_index >= scalar @{$self->view->messages};
 }
 
 

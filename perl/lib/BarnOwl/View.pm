@@ -66,7 +66,7 @@ sub fill_back {
     BarnOwl::debug("Fill back from $pos...");
     my $ml   = BarnOwl::message_list();
     return if $self->at_start;
-    $ml->iterate_begin($pos, 0);
+    $ml->iterate_begin($pos, 1);
     my $count = 0;
     while($count < $FILL_STEP) {
         my $m = $ml->iterate_next;
@@ -114,12 +114,7 @@ sub new_filter {
 
 sub is_empty {
     my $self = shift;
-    return $self->_size == 0;
-}
-
-sub _size {
-    my $self = shift;
-    return scalar @{$self->messages};
+    return scalar @{$self->messages} == 0;
 }
 
 1;
