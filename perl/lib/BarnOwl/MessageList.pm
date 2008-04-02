@@ -3,6 +3,24 @@ use warnings;
 
 package BarnOwl::MessageList;
 
+sub binsearch {
+    my $list = shift;
+    my $val  = shift;
+    my $key  = shift || sub {return $_[0]};
+    my $left = 0;
+    my $right = scalar @{$list} - 1;
+    my $mid = $left;
+    while($left <= $right) {
+        $mid = ($left + $right)/2;
+        if($key->($list->[$mid]) < $val) {
+            $left = $mid + 1;
+        } else {
+            $right = $mid - 1;
+        }
+    }
+    return $mid;
+}
+
 my $__next_id = 0;
 
 sub next_id {
@@ -24,10 +42,18 @@ sub get_size {
     return scalar keys %{$self->{messages}};
 }
 
-sub start_iterate {
+sub iterate_begin {
     my $self = shift;
+    my $id   = shift;
+    my $rev  = shift;
     $self->{keys} = [sort {$a <=> $b} keys %{$self->{messages}}];
-    $self->{iterator} = 0;
+    if($id < 0) {
+        $self->{iterator} = scalar @{$self->{keys}} - 1;
+    } else {
+        $self->{iterator} = binsearch($self->{keys}, $id);
+    }
+    
+    $self->{iterate_direction} = $rev ? -1 : 1;
 }
 
 sub iterate_next {
@@ -36,6 +62,10 @@ sub iterate_next {
         return undef;
     }
     return $self->get_by_id($self->{keys}->[$self->{iterator}++]);
+}
+
+sub iterate_done {
+    # nop
 }
 
 sub get_by_id {

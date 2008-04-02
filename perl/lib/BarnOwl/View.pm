@@ -32,7 +32,7 @@ sub consider_message {
 sub recalculate {
     my $self = shift;
     my $ml   = BarnOwl::message_list();
-    $ml->start_iterate;
+    $ml->iterate_begin(0, 0);
     $self->{messages} = [];
     while(my $msg = $ml->iterate_next) {
         $self->consider_message($msg);

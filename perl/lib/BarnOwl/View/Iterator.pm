@@ -41,18 +41,7 @@ sub initialize_at_id {
     my $id   = shift;
     $self->{view} = $view;
     my $list = $self->view->messages;
-    my $left = 0;
-    my $right = scalar @{$list} - 1;
-    my $mid;
-    while($left <= $right) {
-        $mid = ($left + $right)/2;
-        if($list->[$mid]->id < $id) {
-            $left = $mid + 1;
-        } else {
-            $right = $mid - 1;
-        }
-    }
-    $self->{index} = $mid;
+    $self->{index} = BarnOwl::MessageList::binsearch($list, $id, sub{shift->id});
 }
 
 sub clone {
