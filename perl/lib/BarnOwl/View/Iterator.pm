@@ -101,7 +101,8 @@ sub next {
 
 sub get_message {
     my $self = shift;
-    return $self->view->messages->[$self->eff_index];
+    BarnOwl::debug("get_message: index=@{[$self->index]}, offset=@{[$self->view->offset]}");
+    return BarnOwl::message_list->get_by_id($self->view->messages->[$self->eff_index]);
 }
 
 sub fill_back {
