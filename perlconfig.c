@@ -464,3 +464,44 @@ void owl_perl_freetmps() {
   FREETMPS;
   LEAVE;
 }
+
+void owl_perlconfig_do_dispatch(owl_dispatch *d)
+{
+  SV *cb = (SV*)d->data;
+  unsigned int n_a;
+  dSP;
+  if(cb == NULL) {
+    owl_function_error("Perl callback is NULL!");
+  }
+
+  ENTER;
+  SAVETMPS;
+
+  PUSHMARK(SP);
+  PUTBACK;
+  
+  call_sv(cb, G_DISCARD|G_KEEPERR|G_EVAL);
+
+  if(SvTRUE(ERRSV)) {
+    owl_function_error("%s", SvPV(ERRSV, n_a));
+  }
+
+  FREETMPS;
+  LEAVE;
+}
+
+void owl_perlconfig_invalidate_filter(owl_filter *f)
+{
+  dSP;
+  ENTER;
+  SAVETMPS;
+
+  PUSHMARK(SP);
+  XPUSHs(sv_2mortal(newSVpv(owl_filter_get_name(f), 0)));
+  PUTBACK;
+
+  call_pv("BarnOwl::Hooks::_invalidate_filter", G_DISCARD|G_KEEPERR|G_EVAL);
+
+  FREETMPS;
+  LEAVE;
+}
