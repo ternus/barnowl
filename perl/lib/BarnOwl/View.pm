@@ -7,6 +7,14 @@ use BarnOwl::View::Iterator;
 
 our %view_cache;
 
+sub message_deleted {
+    my $class = shift;
+    my $id = shift;
+    for my $view (values %view_cache) {
+        $view->message($id, 0);
+    }
+}
+
 sub get_name   {shift->{name}};
 sub message {
     my $self = shift;

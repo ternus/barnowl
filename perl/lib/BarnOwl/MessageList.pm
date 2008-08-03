@@ -85,6 +85,7 @@ sub expunge {
     for my $message (values %{$self->{messages}}) {
         if($message->is_deleted) {
             delete $self->{messages}->{$message->id};
+            BarnOwl::View->message_deleted($message->id);
         }
     }
 }
