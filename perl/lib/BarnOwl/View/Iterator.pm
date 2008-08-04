@@ -40,7 +40,7 @@ sub initialize_at_end {
     my $view = shift;
     $self->{view}  = $view;
     $view->recalculate_around(-1);
-    $self->{index} = $view->next_fwd;
+    $self->{index} = $view->range->next_fwd;
     $self->{at_start} = $self->{at_end} = 0;
     $self->prev;
     BarnOwl::debug("Initialize at end");
@@ -107,10 +107,10 @@ sub valid {
 sub prev {
     my $self = shift;
     return if $self->at_start;
-    $self->{index} = $self->view->next_fwd if $self->at_end;
+    $self->{index} = $self->view->range->next_fwd if $self->at_end;
     do {
         $self->{index}--;
-        if($self->{index} == $self->view->next_bk) {
+        if($self->{index} == $self->view->range->next_bk) {
             $self->view->fill_back;
         }
     } while(!$self->view->message($self->index)
@@ -128,15 +128,14 @@ sub prev {
 sub next {
     my $self = shift;
     return if $self->at_end;
-    BarnOwl::debug("NEXT: next_fwd=@{[$self->view->next_fwd]}");
     do {
         $self->{index}++;
-        if($self->index == $self->view->next_fwd) {
+        if($self->index == $self->view->range->next_fwd) {
             BarnOwl::debug("Forward: fill, id=@{[$self->index]}");
             $self->view->fill_forward;
         }
     } while(!$self->view->message($self->index)
-            && $self->index < $self->view->next_fwd);
+            && $self->index < $self->view->range->next_fwd);
 
     BarnOwl::debug("NEXT newid=@{[$self->index]}");
 
