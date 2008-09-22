@@ -1751,9 +1751,6 @@ void owl_function_delete_automsgs()
   owl_view *v;
   owl_filter *f;
 
-  owl_function_error("Trash command temporarily broken");
-  return;
-  
   it = owl_view_iterator_free_later(owl_view_iterator_new());
 
   /* get the trash filter */
@@ -2554,13 +2551,9 @@ void owl_function_delete_curview_msgs(int flag)
   owl_message *m;
   int count = 0;
 
-  owl_function_error("Unsupported");
-  return;
-
   it = owl_view_iterator_free_later(owl_view_iterator_new());
 
   v=owl_global_get_current_view(&g);
-
 
   for(owl_view_iterator_init_start(it, v);
       !owl_view_iterator_is_at_end(it);
