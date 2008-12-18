@@ -154,6 +154,11 @@ sub undelete {
     BarnOwl::message_list()->set_attribute($self => deleted => 0);
 }
 
+sub is_question {
+    my $self = shift;
+    return $self->is_admin && defined($self->{question});
+}
+
 # Serializes the message into something similar to the zwgc->vt format
 sub serialize {
     my ($this) = @_;

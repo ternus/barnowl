@@ -96,7 +96,17 @@ sub _load_perl_commands {
                            "format messages using the perl function <function_name>.\n\n" .
                            "SEE ALSO: show styles, view -s, filter -s\n\n" .
                            "DEPRECATED in favor of BarnOwl::create_style(NAME, OBJECT)",
-                          });
+                       });
+    BarnOwl::new_command(yes => \&BarnOwl::Commands::yes_command,
+                       {
+                           summary => 'Answer yes to a question',
+                           usage   => 'yes',
+                       });
+    BarnOwl::new_command(no => \&BarnOwl::Commands::no_command,
+                       {
+                           summary => 'Answer no to a question',
+                           usage   => 'no',
+                       });
 }
 
 sub _load_owlconf {
