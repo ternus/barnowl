@@ -39,7 +39,8 @@ sub expand_fwd {
     $fwd = $self->{next_fwd} + 1 unless defined $fwd;
     $self->{next_fwd} = $fwd;
     while (defined $self->next &&
-           $self->next_fwd > $self->next->next_bk) {
+           $self->next_fwd >= $self->next->next_bk &&
+           $self->next->next_bk >= 0) {
         BarnOwl::debug("Merge forward at @{[$self->string]} with @{[$self->next->string]}");
         $merge = 1;
         $self->{next_fwd} = max($self->next_fwd, $self->next->next_fwd);
@@ -59,7 +60,7 @@ sub expand_bk {
     $bk = $self->{next_bk} - 1 unless defined $bk;
     $self->{next_bk} = $bk;
     while (defined $self->prev &&
-           $self->next_bk < $self->prev->next_fwd) {
+           $self->next_bk <= $self->prev->next_fwd) {
         BarnOwl::debug("Merge back at @{[$self->string]} with @{[$self->prev->string]}");
         $merge = 1;
         $self->{next_bk} = min($self->next_bk, $self->prev->next_bk);
@@ -80,17 +81,21 @@ sub find_or_insert {
         while(defined($range->next)) {
             $range = $range->next;
         }
-        return BarnOwl::View::RangeList->new($idx, undef, $range, undef);
+        if($range->next_bk < 0) {
+            return $range;
+        }
+        return BarnOwl::View::RangeList->new(-1, undef, $range, undef);
     }
+
     while(defined $range) {
         if($idx < $range->next_bk) {
             # We've gone too far, insert a new zero-length range
             BarnOwl::debug("Insert $idx before @{[$range->string]}");
-            return BarnOwl::View::RangeList->new($idx, $idx + 1,
+            return BarnOwl::View::RangeList->new($idx, $idx,
                                                  $range->prev,
                                                  $range);
         } elsif($idx >= $range->next_bk &&
-                $idx < $range->next_fwd) {
+                $idx <= $range->next_fwd) {
             return $range;
         }
         $last = $range;
@@ -98,7 +103,7 @@ sub find_or_insert {
     }
 
     BarnOwl::debug("Insert at end...");
-    return BarnOwl::View::RangeList->new($idx, $idx + 1, $last, undef);
+    return BarnOwl::View::RangeList->new($idx, $idx, $last, undef);
 }
 
 sub string {

@@ -11,4 +11,6 @@ sub create_style {}
 our $ml = BarnOwl::MessageList->new();
 sub message_list {$ml}
 
+sub debug {}
+
 use BarnOwl;
