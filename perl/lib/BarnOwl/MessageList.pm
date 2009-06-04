@@ -54,11 +54,14 @@ Start an iteration over the message list. Once an iteration has
 started, you can retrieve messages using C<iterate_next>, and stop the
 iteration using C<iterate_done>.
 
+Conceptually, a message list iterator points between two
+messages. C<iterate_next> advances it in the direction of iteration,
+and returns the message it passed over, or C<undef> if it has reached
+the end.
+
 The C<ID> parameter indicates which message to start iterating
-from. If a message with that id exists, it will be the first message
-returned by C<iterate_next>; Otherwise, the first will be the next
-message in iteration order. A negative ID indicates that iteration
-should procede from the end of the message list.
+from. The iterator starts out pointing immediately before that ID. A
+negative ID starts the iterator past the end of the message list.
 
 If the C<REVERSE> parameter is true, the iteration will procede in
 direction of decreasing message ID.
@@ -71,12 +74,12 @@ sub iterate_begin {
     my $rev  = shift;
     $self->{keys} = [sort {$a <=> $b} keys %{$self->{messages}}];
     if($id < 0) {
-        $self->{iterator} = scalar @{$self->{keys}} - 1;
+        $self->{iterator} = scalar @{$self->{keys}};
     } else {
         $self->{iterator} = binsearch($self->{keys}, $id);
-        if($self->{keys}->[$self->{iterator}] != $id && $rev) {
-            $self->{iterator}--;
-        }
+    }
+    if($rev) {
+        $self->{iterator}--;
     }
     
     $self->{iterate_direction} = $rev ? -1 : 1;

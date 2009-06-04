@@ -70,6 +70,13 @@ for my $i (5..NUM_MESSAGES) {
 ok(!defined($ml->iterate_next()));
 $ml->iterate_done();
 
+$ml->iterate_begin($ms[5]->id, 1);
+for my $i (0..4) {
+    is($ml->iterate_next()->id, 4 - $ms[$i]->id);
+}
+ok(!defined($ml->iterate_next()));
+$ml->iterate_done();
+
 
 diag("Deletion is not immediate...");
 
@@ -97,4 +104,12 @@ $ml->iterate_done;
 
 $ml->iterate_begin($ms[5]->id, -1);
 is($ml->iterate_next()->id, $ms[4]->id, "Iterate backwards from a gap");
+$ml->iterate_done;
+
+$ml->iterate_begin(0, 1);
+ok(!defined($ml->iterate_next()), "Reverse iterator at start returns no messages.");
+$ml->iterate_done;
+
+$ml->iterate_begin(-1);
+ok(!defined($ml->iterate_next()), "Forward iterator at end returns no messages");
 $ml->iterate_done;
