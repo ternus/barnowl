@@ -37,6 +37,8 @@ sub expand_fwd {
     my $fwd = shift;
     my $merge = 0;
     $fwd = $self->{next_fwd} + 1 unless defined $fwd;
+    return if defined($self->{next_fwd}) && $fwd < $self->{next_fwd};
+
     $self->{next_fwd} = $fwd;
     while (defined $self->next &&
            $self->next_fwd >= $self->next->next_bk &&
@@ -58,6 +60,8 @@ sub expand_bk {
     my $bk = shift;
     my $merge = 0;
     $bk = $self->{next_bk} - 1 unless defined $bk;
+    return if $self->{next_bk} > 0 && $bk > $self->{next_bk};
+    
     $self->{next_bk} = $bk;
     while (defined $self->prev &&
            $self->next_bk <= $self->prev->next_fwd) {

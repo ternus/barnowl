@@ -103,3 +103,18 @@ $r1->expand_bk;
 is($range->next, $r1);
 is($r1->next_fwd, 11);
 is($r1->next_bk, 10);
+
+# expand_* never shrinks a range
+
+$range = BarnOwl::View::RangeList->new(-1,-1);
+$r = $range->find_or_insert(10);
+$r->expand_fwd(20);
+
+$r->expand_fwd(15);
+is($r->next_fwd, 20);
+is($r->next_bk, 10);
+
+$r->expand_bk(15);
+is($r->next_fwd, 20);
+is($r->next_bk, 10);
+
