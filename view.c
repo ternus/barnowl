@@ -101,22 +101,20 @@ void owl_view_free(owl_view *v)
  * the view iterator API presented here.
  *
  * There are three ways to initialize an iterator:
- * * At the first of the view's messages
- * * Given an ID, at the message in the view closest to that ID
- * * At the last of the view's messages
+ * * Before the first of the view's messages
+ * * Given an ID, before the message in the view closest to that ID
+ * * After the last of the view's messages
  *
- * In addition to pointing at a message, an iterator may point at two
- * special positions, before the first message in the list, and after
- * the last message in the list
+ * Iterators strictly point between two messages, not at a message. A
+ * method is provided to return the message after an iterator; It
+ * returns NULL if the iterator points beyond the last message in the
+ * list.
  *
- * The predicates is_at_start and is_at_end test for these special
- * iterators.
+ * The predicates is_at_start and is_at_end test for the iterators at
+ * either end of the list.
  *
- * The predicates has_next and has_prev test whether an iterator
- * points to the first or last message in the view
- *
- * _prev and _next, if applied to the special "start" or "end"
- * iterators respectively, are no-ops.
+ * _prev and _next, if applied to iterators at the start or end,
+ * respectively, are no-ops.
  */
 
 #define CALL_BOOL(it, method)                           \
@@ -145,6 +143,11 @@ void owl_view_iterator_invalidate(owl_view_iterator *it)
   CALL_VOID(it, "invalidate");
 }
 
+int owl_view_iterator_is_valid(owl_view_iterator *it)
+{
+  CALL_BOOL(it, "valid");
+}
+
 void owl_view_iterator_init_id(owl_view_iterator *it, owl_view *v, int message_id)
 {
   OWL_PERL_CALL_METHOD(it, "initialize_at_id",
@@ -167,7 +170,7 @@ void owl_view_iterator_init_start(owl_view_iterator *it, owl_view *v)
                        OWL_PERL_VOID_CALL);
 }
 
-/* Initialized iterator to point at the first message */
+/* Initialized iterator to point after the last message */
 void owl_view_iterator_init_end(owl_view_iterator *it, owl_view *v)
 {
   OWL_PERL_CALL_METHOD(it, "initialize_at_end",
@@ -187,16 +190,6 @@ void owl_view_iterator_clone(owl_view_iterator *dst, owl_view_iterator *src)
                        OWL_PERL_VOID_CALL);
 }
 
-int owl_view_iterator_has_prev(owl_view_iterator *it)
-{
-  CALL_BOOL(it, "has_prev");
-}
-
-int owl_view_iterator_has_next(owl_view_iterator *it)
-{
-  CALL_BOOL(it, "has_next");
-}
-
 int owl_view_iterator_is_at_end(owl_view_iterator *it)
 {
   CALL_BOOL(it, "at_end");
@@ -205,11 +198,6 @@ int owl_view_iterator_is_at_end(owl_view_iterator *it)
 int owl_view_iterator_is_at_start(owl_view_iterator *it)
 {
   CALL_BOOL(it, "at_start");
-}
-
-int owl_view_iterator_is_valid(owl_view_iterator *it)
-{
-  CALL_BOOL(it, "valid");
 }
 
 void owl_view_iterator_prev(owl_view_iterator *it)

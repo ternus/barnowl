@@ -29,10 +29,15 @@ sub message {
 };
 sub get_filter {shift->{filter}};
 
-sub at_start      {shift->{at_start}};
-sub at_end        {shift->{at_end}};
-sub is_empty      {shift->{is_empty}};
-sub range         {shift->{range}};
+sub is_empty      {
+    my $self = shift;
+    unless(defined($self->{is_empty})) {
+        $self->{is_empty} = 1;
+        $self->fill_forward($self->ranges->find_or_insert(0));
+    }
+    return $self->{is_empty};
+};
+
 sub ranges        {shift->{ranges}};
 
 sub new {
@@ -47,8 +52,7 @@ sub new {
     my $self  = {messages  => "",
                  name      => $name,
                  filter    => $filter,
-                 is_empty  => 1,
-                 range     => undef,
+                 is_empty  => undef,
                  ranges    => undef};
     bless $self, $class;
     $self->reset;
@@ -67,52 +71,30 @@ sub consider_message {
 sub _consider_message {
     my $self = shift;
     my $msg  = shift;
-    return unless $self->at_end;
+
+    my $range = $self->ranges->find_or_insert($msg->{id});
+    $range->expand_fwd($msg->{id} + 1);
+    
     if(BarnOwl::filter_message_match($self->get_filter, $msg)) {
         $self->message($msg->{id}, 1);
         $self->{is_empty} = 0;
     }
-    $self->range->expand_fwd($msg->{id} + 1);
 }
 
 sub reset {
     my $self = shift;
     $self->{messages} = "";
-    $self->{at_start} = $self->{at_end} = 0;
-    $self->{is_empty} = 1;
-    $self->{range} = undef;
-    $self->{ranges} = BarnOwl::View::RangeList->new(-1, 0);
+    $self->{is_empty} = undef;
+
+    $self->{ranges} = BarnOwl::View::RangeList->new(-1, -1);
 }
 
-sub recalculate_around {
-    my $self = shift;
-    my $where = shift;
-    BarnOwl::debug("recalulate @{[$self->get_filter]} around $where");
-
-    if($where == 0) {
-        $self->{at_start} = 1;
-        $self->{at_end}   = 0;
-    } elsif($where < 0) {
-        $self->{at_start} = 0;
-        $self->{at_end}   = 1;
-    } else {
-        $self->{at_end} = $self->{at_start} = 0;
-    }
-
-    $self->{range} = $self->ranges->find_or_insert($where);
-    BarnOwl::debug("[@{[$self->get_filter]}] new range from @{[$self->range->string]}");
-    BarnOwl::debug("[@{[$self->get_filter]}]" . $self->ranges->string_chain);
-
-    $self->fill_forward;
-    $self->fill_back;
-}
-
-my $FILL_STEP = 100;
+our $FILL_STEP = 100;
 
 sub fill_back {
     my $self = shift;
-    return if $self->at_start;
-    my $pos  = $self->range->next_bk;
+    my $range = shift;
+    my $pos  = $range->next_bk;
     my $ml   = BarnOwl::message_list();
     my $m;
 
@@ -122,11 +104,10 @@ sub fill_back {
     do {
         $m = $ml->iterate_next;
 
-        $self->range->expand_fwd($m->{id} + 1) unless defined $self->range->next_fwd;
+        $range->expand_fwd($m->{id} + 1) if $range->next_fwd < 0;
 
         unless(defined $m) {
             BarnOwl::debug("Hit start in fill_back.");
-            $self->{at_start} = 1;
             goto loop_done;
         }
 
@@ -137,9 +118,9 @@ sub fill_back {
             $self->message($m->{id}, 1);
         }
 
-        if($self->range->expand_bk($m->{id} - 1)) {
+        if($range->expand_bk($m->{id})) {
             $ml->iterate_done;
-            $ml->iterate_begin($self->range->next_bk, 1);
+            $ml->iterate_begin($range->next_bk, 1);
         }
     } while(($pos - $m->{id}) < $FILL_STEP);
 
@@ -150,8 +131,8 @@ loop_done:
 
 sub fill_forward {
     my $self = shift;
-    return if $self->at_end;
-    my $pos  = $self->range->next_fwd;
+    my $range = shift;
+    my $pos  = $range->next_fwd;
     my $ml   = BarnOwl::message_list();
     my $m;
 
@@ -161,7 +142,7 @@ sub fill_forward {
     do {
         $m = $ml->iterate_next;
         unless(defined $m) {
-            $self->{at_end} = 1;
+            BarnOwl::debug("Hit end in fill_forward.");
             goto loop_done;
         }
 
@@ -172,9 +153,9 @@ sub fill_forward {
             $self->message($m->{id}, 1);
         }
         
-        if($self->range->expand_fwd($m->{id} + 1)) {
+        if($range->expand_fwd($m->{id} + 1)) {
             $ml->iterate_done;
-            $ml->iterate_begin($self->range->next_fwd);
+            $ml->iterate_begin($range->next_fwd);
         }
     } while(($m->{id} - $pos) < $FILL_STEP);
 

@@ -88,7 +88,7 @@ sub find_or_insert {
         if($range->next_bk < 0) {
             return $range;
         }
-        return BarnOwl::View::RangeList->new(-1, undef, $range, undef);
+        return BarnOwl::View::RangeList->new(-1, -1, $range, undef);
     }
 
     while(defined $range) {

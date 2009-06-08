@@ -55,7 +55,7 @@ is($r2->next, $r3);
 
 $r3->expand_bk(50);
 is($r3->next_bk, 50);
-is($r3->next_fwd, undef);
+is($r3->next_fwd, -1);
 $r3->expand_fwd(51);
 is($r3->next_fwd, 51);
 
