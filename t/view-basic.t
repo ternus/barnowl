@@ -135,3 +135,31 @@ for my $i (0..100) {
     is($m1->{num}, $i);
     is($m2->{num}, 100-$i);
 }
+
+### Interaction with deletion
+
+BarnOwl::View::invalidate_filter('all');
+$view = BarnOwl::View->new('view-all', 'all');
+
+$it->initialize_at_start($view);
+$it->get_message->delete;
+BarnOwl::message_list()->expunge;
+
+isnt($it->get_message, $it, "Deleted message is not returned");
+is($it->get_message->{num}, 1, "Next message is returned after delete.");
+
+$it->next;
+is($it->get_message->{num}, 2);
+$it->get_message->delete;
+BarnOwl::message_list()->expunge;
+$it->next;
+is($it->get_message->{num}, 4);
+
+$it->initialize_at_end($view);
+$it->prev;
+
+$it->get_message->delete;
+BarnOwl::message_list()->expunge;
+
+is($it->get_message, undef);
+ok($it->is_at_end, "Deleting last messages moves iterator to end.");

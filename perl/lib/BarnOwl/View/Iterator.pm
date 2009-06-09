@@ -3,9 +3,6 @@ use warnings;
 
 package BarnOwl::View::Iterator;
 
-# Invariant: $self->view->message($self->index) is always true unless
-# $self->is_at_end
-
 sub view {return shift->{view}}
 sub index {return shift->{index}}
 
@@ -40,9 +37,6 @@ sub initialize_at_start {
     $self->{view}  = $view;
     $self->{index} = 0;
     BarnOwl::debug("Initialize at start");
-
-    $self->next;
-    $self->prev;
 }
 
 sub initialize_at_end {
@@ -110,29 +104,44 @@ sub prev {
     return 0;
 }
 
-sub next {
+sub fill_forward {
     my $self = shift;
-    my $old_idx = $self->index;
     my $range = $self->range;
     
-    do {
-        $self->{index}++;
+    if($self->index >= $range->next_fwd) {
+        BarnOwl::debug("Forward: fill, id=@{[$self->index]}");
+        $self->view->fill_forward($range);
         if($self->index >= $range->next_fwd) {
-            BarnOwl::debug("Forward: fill, id=@{[$self->index]}");
-            $self->view->fill_forward($range);
-            if($self->index >= $range->next_fwd) {
-                # Reached end
-                return 1;
-            }
+            # Reached end
+            return 1;
         }
-    } while(!$self->view->message($self->index));
-
-    BarnOwl::debug("NEXT newid=@{[$self->index]}");
+    }
     return 0;
+}
+
+sub fixup {
+    my $self = shift;
+
+    return 1 if $self->fill_forward;
+
+    while(!$self->view->message($self->index)) {
+        $self->{index}++;
+        return 1 if $self->fill_forward;
+    }
+    return 0;
+}
+
+sub next {
+    my $self = shift;
+
+    return 1 if $self->fixup;
+    $self->{index}++;
+    return $self->fixup
 }
 
 sub get_message {
     my $self = shift;
+    $self->fixup;
     BarnOwl::debug("get_message: index=@{[$self->index]}");
     return BarnOwl::message_list->get_by_id($self->index);
 }
