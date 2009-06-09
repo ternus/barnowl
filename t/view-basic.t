@@ -16,25 +16,6 @@ BEGIN {
     require (dirname($0) . "/mock.pl");
 };
 
-sub is_prime {
-    my $n = shift;
-    if($n <= 1) {
-        return 0;
-    }
-    for my $i (2 .. int(sqrt($n))) {
-        if($n % $i == 0) {
-            return 0;
-        }
-    }
-    return 1;
-}
-
-BarnOwl::new_filter(all => sub {1});
-BarnOwl::new_filter(none => sub {0});
-BarnOwl::new_filter(even => sub {(shift->{num} % 2) == 0});
-BarnOwl::new_filter(odd  => sub {(shift->{num} % 2) == 1});
-BarnOwl::new_filter(prime  => sub {is_prime(shift->{num})});
-
 my $ml = BarnOwl::message_list;
 
 for my $i (0..100) {
