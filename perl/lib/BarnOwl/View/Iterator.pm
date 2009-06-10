@@ -149,6 +149,10 @@ sub get_message {
 sub cmp {
     my $self = shift;
     my $other = shift;
+
+    $self->fixup;
+    $other->fixup;
+    
     return $self->index - $other->index;
 }
 
