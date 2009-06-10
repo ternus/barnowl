@@ -278,14 +278,14 @@ int owl_message_is_private(owl_message *m)
 /*
   A note on times: For backwards compatibility with owl, we store the
   ``timestr'' (ctime) under the ``time'' key in the has, and the
-  numeric time as ``_time''. Setting the numeric time automatically
-  recomputes the timestr.
+  numeric time as ``unix_time''. Setting the numeric time
+  automatically recomputes the timestr.
  */
 void owl_message_set_time(owl_message *m, time_t tm)
 {
   char * timestr;
   timestr = owl_sprintf("%d", tm);
-  owl_message_set_attribute(m, "_time", timestr);
+  owl_message_set_attribute(m, "unix_time", timestr);
   owl_free(timestr);
   timestr = owl_strdup(ctime(&tm));
   /* Chop the newline */
@@ -296,7 +296,7 @@ void owl_message_set_time(owl_message *m, time_t tm)
 
 time_t owl_message_get_time(owl_message *m)
 {
-  return (time_t)owl_message_get_attribute_int(m, "_time");
+  return (time_t)owl_message_get_attribute_int(m, "unix_time");
 }
 
 char *owl_message_get_timestr(owl_message *m)

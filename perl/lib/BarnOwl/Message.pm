@@ -19,7 +19,7 @@ sub new {
     my %args = (
         __meta    => {deleted => 0},
         time      => $timestr,
-        _time     => $time,
+        unix_time => $time,
         login     => 'none',
         direction => 'none',
         @_);
@@ -40,7 +40,7 @@ sub new {
 sub lock_message {
     my $self = shift;
     for my $k (keys %$self) {
-        if($k !~ /^_/ || $k eq '_time') {
+        if($k !~ /^_/) {
             Internals::SvREADONLY $self->{$k}, 1;
         }
     }
@@ -55,7 +55,7 @@ sub __set_attribute {
 
 sub __format_attributes {
     my $self = shift;
-    my %skip = map {$_ => 1} qw(_time fields id __meta __fmtext type);
+    my %skip = map {$_ => 1} qw(unix_time fields id __meta __fmtext type);
     my $text = "";
     my @keys = sort keys %$self;
     for my $k (@keys) {
