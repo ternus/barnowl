@@ -79,6 +79,7 @@ sub is_at_start {
 
 sub is_at_end {
     my $self = shift;
+    $self->fixup;
     return !$self->view->message($self->index);
 }
 

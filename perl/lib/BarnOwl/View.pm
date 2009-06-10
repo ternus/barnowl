@@ -31,11 +31,9 @@ sub get_filter {shift->{filter}};
 
 sub is_empty      {
     my $self = shift;
-    unless(defined($self->{is_empty})) {
-        $self->{is_empty} = 1;
-        $self->fill_forward($self->ranges->find_or_insert(0));
-    }
-    return $self->{is_empty};
+    my $it = BarnOwl::View::Iterator->new();
+    $it->initialize_at_start($self);
+    return $it->is_at_end;
 };
 
 sub ranges        {shift->{ranges}};
@@ -52,7 +50,6 @@ sub new {
     my $self  = {messages  => "",
                  name      => $name,
                  filter    => $filter,
-                 is_empty  => undef,
                  ranges    => undef};
     bless $self, $class;
     $self->reset;
@@ -77,15 +74,12 @@ sub _consider_message {
     
     if(BarnOwl::filter_message_match($self->get_filter, $msg)) {
         $self->message($msg->{id}, 1);
-        $self->{is_empty} = 0;
     }
 }
 
 sub reset {
     my $self = shift;
     $self->{messages} = "";
-    $self->{is_empty} = undef;
-
     $self->{ranges} = BarnOwl::View::RangeList->new(-1, -1);
 }
 
@@ -114,7 +108,6 @@ sub fill_back {
         $pos = $m->{id} if $pos < 0;
 
         if(BarnOwl::filter_message_match($self->get_filter, $m)) {
-            $self->{is_empty} = 0;
             $self->message($m->{id}, 1);
         }
 
@@ -149,7 +142,6 @@ sub fill_forward {
         $pos = $m->{id} if $pos < 0;
 
         if(BarnOwl::filter_message_match($self->get_filter, $m)) {
-            $self->{is_empty} = 0;
             $self->message($m->{id}, 1);
         }
         

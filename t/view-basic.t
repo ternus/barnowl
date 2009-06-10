@@ -117,6 +117,21 @@ for my $i (0..100) {
     is($m2->{num}, 100-$i);
 }
 
+### Test a sparser view
+
+my $primes = BarnOwl::View->new('prime', 'prime');
+$it->initialize_at_start($primes);
+
+is($it->get_message->{num}, 2);
+
+for my $i (qw(2 3 5 7 11 13 17 19 23 29 31 37 41
+              43 47 53 59 61 67 71 73 79 83 89 97)) {
+    is($it->get_message->{num}, $i);
+    $it->next;
+}
+
+ok($it->is_at_end);
+
 ### Interaction with deletion
 
 BarnOwl::View::invalidate_filter('all');
