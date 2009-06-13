@@ -739,7 +739,7 @@ void owl_message_create_from_znotice(owl_message *m, ZNotice_t *n)
     av_push(av_zfields, newSVpvn(ptr, strlen(ptr)));
     owl_free(ptr);
   }
-  hv_store((HV*)SvRV(m), "fields", strlen("fields"), newRV_noinc((SV*)av_zfields), 0);
+  (void)hv_store((HV*)SvRV(m), "fields", strlen("fields"), newRV_noinc((SV*)av_zfields), 0);
 
   /* Auth */
   owl_message_set_attribute(m, "auth", owl_zephyr_get_authstr(n));
@@ -943,7 +943,7 @@ void owl_message_set_fmtext_cache(owl_message *m, owl_fmtext_cache *fm)
   SV *fmtext = newSV(0);
   sv_setref_iv(fmtext, Nullch, (fm - fmtext_cache));
   HV *hash = (HV*)SvRV((SV*)m);
-  hv_store(hash, "__fmtext", strlen("__fmtext"), fmtext, 0);
+  (void)hv_store(hash, "__fmtext", strlen("__fmtext"), fmtext, 0);
 }
 
 owl_fmtext *owl_message_get_fmtext(owl_message *m)
