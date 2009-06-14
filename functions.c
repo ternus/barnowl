@@ -1181,7 +1181,7 @@ void owl_function_calculate_topmsg_normal(int direction, owl_view *v, owl_view_i
     if (savey < (recwinlines / 4)) {
       y=0;
       for (owl_view_iterator_clone(it, curmsg);
-           owl_view_iterator_has_prev(it);
+           !owl_view_iterator_is_at_start(it);
            owl_view_iterator_prev(it)) {
         lines = owl_message_get_numlines(owl_view_iterator_get_message(it));
         /* will we run the curmsg off the screen? */
