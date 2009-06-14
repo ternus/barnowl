@@ -70,3 +70,20 @@ ok($i1->is_at_end, "Deleting only message moves start iterator to end");
 ok($i1->is_at_start, "Start iterator still at start.");
 
 ok($view->is_empty, "Deleting last message empties view");
+
+## Iterators don't loop forever on empty message list
+
+$BarnOwl::ml = BarnOwl::MessageList->new();
+
+BarnOwl::View::invalidate_filter('all');
+
+$view = BarnOwl::View->new('all', 'all');
+$i1->initialize_at_start($view);
+
+ok($i1->is_at_start);
+ok($i1->is_at_end);
+
+$i1->next;
+
+ok($i1->is_at_start);
+ok($i1->is_at_end);

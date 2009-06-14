@@ -5,11 +5,15 @@ package BarnOwl::MessageList;
 
 sub binsearch {
     my $list = shift;
+
+    return 0 unless @$list;
+    
     my $val  = shift;
     my $key  = shift || sub {return $_[0]};
     my $left = 0;
     my $right = scalar @{$list} - 1;
-    my $mid = $left;
+    my $mid;
+
     while($left < $right) {
         $mid = int(($left + $right)/2);
         my $k = $key->($list->[$mid]);
