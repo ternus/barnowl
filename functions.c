@@ -2135,6 +2135,9 @@ void owl_function_change_currentview_filter(char *filtname)
   if(curid < 0) {
     curid = owl_filter_get_cachedmsgid(f);
   }
+  if(curid < 0) {
+    curid = 0;
+  }
   owl_view_iterator_init_id(it, v, curid);
 
   owl_global_set_curmsg(&g, it);
