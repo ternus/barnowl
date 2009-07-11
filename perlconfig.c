@@ -25,7 +25,7 @@ static void owl_perl_xs_init(pTHX)
 
 SV *owl_perlconfig_message2hashref(owl_message *m)
 {
-  return (SV*)m;
+  return SvREFCNT_inc(m);
 }
 
 SV *owl_perlconfig_curmessage2hashref(void) /*noproto*/
