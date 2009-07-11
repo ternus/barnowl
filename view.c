@@ -192,12 +192,12 @@ void owl_view_iterator_clone(owl_view_iterator *dst, owl_view_iterator *src)
 
 int owl_view_iterator_is_at_end(owl_view_iterator *it)
 {
-  CALL_BOOL(it, "at_end");
+  CALL_BOOL(it, "is_at_end");
 }
 
 int owl_view_iterator_is_at_start(owl_view_iterator *it)
 {
-  CALL_BOOL(it, "at_start");
+  CALL_BOOL(it, "is_at_start");
 }
 
 void owl_view_iterator_prev(owl_view_iterator *it)
