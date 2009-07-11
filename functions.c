@@ -1163,7 +1163,8 @@ void owl_function_calculate_topmsg_normal(int direction, owl_view *v, owl_view_i
   for (owl_view_iterator_clone(it, topmsg);
        owl_view_iterator_cmp(it, curmsg) <= 0
          /* If we ever find we're off-screen, we can stop */
-         && savey <= recwinlines; 
+         && savey <= recwinlines
+         && !owl_view_iterator_is_at_end(it);
        owl_view_iterator_next(it)) {
     savey += owl_message_get_numlines(owl_view_iterator_get_message(it));
   }
