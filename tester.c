@@ -16,7 +16,7 @@ int main(int argc, char **argv, char **env)
 {
   owl_errqueue_init(owl_global_get_errqueue(&g));
   owl_obarray_init(&(g.obarray));
-  owl_perlconfig_initperl(NULL);
+  owl_perlconfig_initperl(NULL, &argc, &argv, &env);
   /* Now that we have perl, we can initialize the msssage list*/
   g.msglist = owl_messagelist_new();
 
