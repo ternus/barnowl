@@ -664,18 +664,14 @@ void owl_function_prevmsg_full(char *filter, int skip_deleted, int first_if_none
   owl_view_iterator_clone(it, owl_global_get_curmsg(&g));
   found=0;
 
-  for (owl_view_iterator_prev(it);
-       !owl_view_iterator_is_at_start(it);
-       owl_view_iterator_prev(it)) {
+  while(!owl_view_iterator_is_at_start(it)) {
+    owl_view_iterator_prev(it);
     m = owl_view_iterator_get_message(it);
     if (skip_deleted && owl_message_is_delete(m)) continue;
     if (f && !owl_filter_message_match(f, m)) continue;
     found = 1;
     break;
   }
-
-  if(owl_view_iterator_is_at_start(it))
-    owl_view_iterator_next(it);
 
   if (!found) {
     owl_function_makemsg("already at first%s message%s%s",
@@ -814,6 +810,7 @@ void owl_function_lastmsg_noredisplay()
 
   v=owl_global_get_current_view(&g);
   owl_view_iterator_init_end(it, v);
+  owl_view_iterator_prev(it);
   owl_global_set_topmsg(&g, it);
   owl_global_set_curmsg(&g, it);
   owl_function_calculate_topmsg(OWL_DIRECTION_UPWARDS);
@@ -3017,14 +3014,17 @@ void owl_function_search_helper(int mode, int direction)
   }
 
   /* bounds check */
-  if (owl_view_iterator_is_at_start(it)
-      || owl_view_iterator_is_at_end(it)) {
+  if ((direction==OWL_DIRECTION_DOWNWARDS
+       && owl_view_iterator_is_at_end(it))
+      ||
+      (direction==OWL_DIRECTION_UPWARDS
+       && owl_view_iterator_is_at_start(it))) {
     owl_function_error("No further matches found");
     return;
   }
 
-  while(owl_view_iterator_is_at_start(it)
-        || owl_view_iterator_is_at_end(it)) {
+  while(!owl_view_iterator_is_at_start(it)
+        && !owl_view_iterator_is_at_end(it)) {
     m=owl_view_iterator_get_message(it);
     if (owl_message_search(m, owl_global_get_search_string(&g))) {
       owl_global_set_curmsg(&g, it);
