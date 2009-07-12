@@ -62,7 +62,8 @@ void sepbar(char *in)
   }
 
   owl_view_iterator_clone(iter, owl_mainwin_get_last_msg(owl_global_get_mainwin(&g)));
-  if (owl_view_iterator_is_valid(iter)) {
+  if (owl_view_iterator_is_valid(iter)
+      && !owl_view_iterator_is_at_end(iter)) {
     getyx(sepwin, y, x);
     wmove(sepwin, y, x+2);
     wattron(sepwin, A_BOLD);
