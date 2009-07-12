@@ -761,11 +761,21 @@ void owl_function_undeletecur(int move_after)
 void owl_function_expunge()
 {
   owl_messagelist *ml;
+  owl_view_iterator *cur;
 
   ml=owl_global_get_msglist(&g);
 
   /* expunge the message list */
   owl_messagelist_expunge(ml);
+
+  /*
+   * If we deleted the last message, and the point was on it, fix up
+   * the point.
+   */
+  cur = owl_global_get_curmsg(&g);
+  if(owl_view_iterator_is_at_end(cur))
+    owl_view_iterator_prev(cur);
+
   owl_function_calculate_topmsg(OWL_DIRECTION_NONE);
   /* if there are no messages set the direction to down in case we
      delete everything upwards */
