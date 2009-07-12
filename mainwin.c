@@ -29,6 +29,12 @@ void owl_mainwin_redisplay(owl_mainwin *mw)
   v=owl_global_get_current_view(&g);
   owl_fmtext_reset_colorpairs();
 
+  if(owl_view_iterator_is_at_end(curmsg)
+     && !owl_view_iterator_is_at_start(curmsg)) {
+    owl_function_error("WARNING: curmsg is-at-end. Please report this bug to bug-barnowl@mit.edu");
+    owl_view_iterator_prev(curmsg);
+  }
+
   if (v==NULL) {
     owl_function_debugmsg("Hit a null window in owl_mainwin_redisplay.");
     return;
