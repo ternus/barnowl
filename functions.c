@@ -760,28 +760,12 @@ void owl_function_undeletecur(int move_after)
 
 void owl_function_expunge()
 {
-  owl_message *m;
   owl_messagelist *ml;
-  owl_view_iterator *it;
-  owl_view *v;
-  int lastmsgid=0;
 
-  it = owl_view_iterator_free_later(owl_view_iterator_new());
-
-  v=owl_global_get_current_view(&g);
   ml=owl_global_get_msglist(&g);
-
-  m = owl_global_get_current_message(&g);
-  if (m) lastmsgid = owl_message_get_id(m);
 
   /* expunge the message list */
   owl_messagelist_expunge(ml);
-
-  /* find where the new position should be
-     (as close as possible to where we last where) */
-  owl_view_iterator_init_id(it, v, lastmsgid);
-  owl_global_set_curmsg(&g, it);
-  owl_global_set_topmsg(&g, it);
   owl_function_calculate_topmsg(OWL_DIRECTION_NONE);
   /* if there are no messages set the direction to down in case we
      delete everything upwards */
