@@ -2133,6 +2133,10 @@ void owl_function_change_currentview_filter(char *filtname)
   }
   owl_view_iterator_init_id(it, v, curid);
 
+  if(owl_view_iterator_is_at_end(it)) {
+    owl_view_iterator_prev(it);
+  }
+
   owl_global_set_curmsg(&g, it);
   owl_global_set_topmsg(&g, it);
 
