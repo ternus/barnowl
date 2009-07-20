@@ -61,17 +61,13 @@ void owl_function_show_commands()
   owl_fmtext_free(&fm);
 }
 
-void owl_function_show_view(char *viewname)
+void owl_function_show_view()
 {
   owl_view *v;
   owl_fmtext fm;
 
   /* we only have the one view right now */
   v=owl_global_get_current_view(&g);
-  if (viewname && strcmp(viewname, owl_view_get_name(v))) {
-    owl_function_error("No view named '%s'", viewname);
-    return;
-  }
 
   owl_fmtext_init_null(&fm);
   owl_view_to_fmtext(v, &fm);
@@ -2117,7 +2113,7 @@ void owl_function_change_currentview_filter(char *filtname)
     return;
   }
 
-  v = owl_view_new("main", filtname);
+  v = owl_view_new(filtname);
   owl_global_set_current_view(&g, v);
 
   /* Figure out what to set the current message to.

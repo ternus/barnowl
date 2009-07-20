@@ -17,7 +17,6 @@ sub message_deleted {
     }
 }
 
-sub get_name   {shift->{name}};
 sub message {
     my $self = shift;
     my $idx = shift;
@@ -40,7 +39,6 @@ sub ranges        {shift->{ranges}};
 
 sub new {
     my $class = shift;
-    my $name = shift;
     my $filter = shift;
     if(defined($view_cache{$filter})) {
         my $self = $view_cache{$filter};
@@ -48,7 +46,6 @@ sub new {
     }
 
     my $self  = {messages  => "",
-                 name      => $name,
                  filter    => $filter,
                  ranges    => undef};
     bless $self, $class;

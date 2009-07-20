@@ -28,13 +28,12 @@ for my $i (0..100) {
 my $view;
 my $it;
 
-$view = BarnOwl::View->new('view-all', 'all');
-is($view->get_name, 'view-all');
+$view = BarnOwl::View->new('all');
 is($view->get_filter, 'all');
 
 ok(!$view->is_empty);
 
-is(BarnOwl::View->new('view-all', 'all'), $view, "View->new is memoized");
+is(BarnOwl::View->new('all'), $view, "View->new is memoized");
 
 ######
 
@@ -67,7 +66,7 @@ ok($it->is_at_end, "Iterator after iteration is at end");
 diag("Do a reverse iteration...");
 
 BarnOwl::View::invalidate_filter('all');
-$view = BarnOwl::View->new('view-all', 'all');
+$view = BarnOwl::View->new('all');
 
 $it->initialize_at_end($view);
 
@@ -84,7 +83,7 @@ ok($it->is_at_start);
 #####
 # Empty view is empty
 
-$view = BarnOwl::View->new('none', 'none');
+$view = BarnOwl::View->new('none');
 ok($view->is_empty, "Empty view is empty");
 
 $it->initialize_at_start($view);
@@ -98,7 +97,7 @@ ok($it->is_at_end, "at_end on empty view is at end");
 ### Simultaneous iteration works
 
 BarnOwl::View::invalidate_filter('all');
-$view = BarnOwl::View->new('view-all', 'all');
+$view = BarnOwl::View->new('all');
 
 my $i1 = BarnOwl::View::Iterator->new;
 my $i2 = BarnOwl::View::Iterator->new;
@@ -119,7 +118,7 @@ for my $i (0..100) {
 
 ### Test a sparser view
 
-my $primes = BarnOwl::View->new('prime', 'prime');
+my $primes = BarnOwl::View->new('prime');
 $it->initialize_at_start($primes);
 
 is($it->get_message->{num}, 2);
@@ -135,7 +134,7 @@ ok($it->is_at_end);
 ### Interaction with deletion
 
 BarnOwl::View::invalidate_filter('all');
-$view = BarnOwl::View->new('view-all', 'all');
+$view = BarnOwl::View->new('all');
 
 $it->initialize_at_start($view);
 $it->get_message->delete;

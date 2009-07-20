@@ -2167,11 +2167,7 @@ char *owl_command_show(int argc, char **argv, char *buff)
       owl_function_show_keymap(argv[2]);
     }
   } else if (!strcmp(argv[1], "view")) {
-    if (argc==3) {
-      owl_function_show_view(argv[2]);
-    } else {
-      owl_function_show_view(NULL);
-    }
+    owl_function_show_view();
   } else if (!strcmp(argv[1], "colors")) {
     owl_function_show_colors();
   } else if (!strcmp(argv[1], "styles")) {

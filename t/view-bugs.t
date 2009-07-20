@@ -29,7 +29,7 @@ my $view;
 my $i1;
 my $i2;
 
-$view = BarnOwl::View->new('all', 'all');
+$view = BarnOwl::View->new('all');
 
 $i1 = BarnOwl::View::Iterator->new;
 $i2 = BarnOwl::View::Iterator->new;
@@ -56,7 +56,7 @@ is($i2->cmp($i1), 0);
 
 # is_empty updates appropriately.
 
-$view = BarnOwl::View->new('one', 'one');
+$view = BarnOwl::View->new('one');
 ok(!$view->is_empty, "View with one message is not empty");
 
 $i1->initialize_at_start($view);
@@ -77,7 +77,7 @@ $BarnOwl::ml = BarnOwl::MessageList->new();
 
 BarnOwl::View::invalidate_filter('all');
 
-$view = BarnOwl::View->new('all', 'all');
+$view = BarnOwl::View->new('all');
 $i1->initialize_at_start($view);
 
 ok($i1->is_at_start);

@@ -4,23 +4,10 @@
 
 static const char fileIdent[] = "$Id$";
 
-owl_view* owl_view_new(char *name, char *filtname)
+owl_view* owl_view_new(char *filtname)
 {
-  char *args[] = {name, filtname};
-  return owl_perl_new_argv("BarnOwl::View", args, 2);
-}
-
-char *owl_view_get_name(owl_view *v)
-{
-  SV *name;
-  OWL_PERL_CALL_METHOD(v, "get_name",
-                       /* no args */,
-                       /* error message */
-                       "Error in get_name: %s",
-                       1 /* fatal errors */,
-                       name = SvREFCNT_inc(POPs););
-  sv_2mortal(name);
-  return SvPV_nolen(name);
+  char *args[] = {filtname};
+  return owl_perl_new_argv("BarnOwl::View", args, 1);
 }
 
 owl_filter * owl_view_get_filter(owl_view *v)
@@ -68,10 +55,6 @@ void owl_view_save_curmsgid(owl_view *v, int curid)
 /* fmtext should already be initialized */
 void owl_view_to_fmtext(owl_view *v, owl_fmtext *fm)
 {
-  owl_fmtext_append_normal(fm, "Name: ");
-  owl_fmtext_append_normal(fm, owl_view_get_name(v));
-  owl_fmtext_append_normal(fm, "\n");
-
   owl_fmtext_append_normal(fm, "Filter: ");
   owl_fmtext_append_normal(fm, owl_view_get_filtname(v));
   owl_fmtext_append_normal(fm, "\n");
