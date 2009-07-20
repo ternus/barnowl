@@ -15,4 +15,5 @@ my $m = BarnOwl::Message->new(
    );
 ok($m, "Created a message");
 isa_ok($m, "BarnOwl::Message::Generic", "Message->new blessed into the correct type");
-ok($m->{_time} - $now <= 1, "Message->new set the time");
+ok(defined($m->{unix_time}), "Message->new set the time");
+ok(abs($m->{unix_time} - $now) <= 1, "Message->new set the time to now");
