@@ -15,6 +15,10 @@ sub new {
     return bless $self, $class;
 }
 
+sub set_attribute {
+    
+}
+
 sub get_size {
     my $self = shift;
     return scalar keys %{$self->{messages}};
