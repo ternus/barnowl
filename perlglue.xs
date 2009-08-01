@@ -267,6 +267,14 @@ error(text)
 	}
 
 void
+debug(text)
+	char *text
+	CODE:
+	{
+		owl_function_debugmsg("%s", text);
+	}
+
+void
 create_style(name, object)
      char *name
      SV  *object

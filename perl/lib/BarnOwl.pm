@@ -127,6 +127,10 @@ Reports an error and log it in `show errors'. Note that in any
 callback or hook called in perl code from BarnOwl, a C<die> will be
 caught and passed to C<error>.
 
+=head2 debug STRING
+
+Logs a debugging message to BarnOwl's debug log
+
 =head2 getnumcolors
 
 Returns the number of colors this BarnOwl is capable of displaying
