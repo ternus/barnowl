@@ -11,20 +11,21 @@ use BarnOwl::Message::Zephyr;
 
 use POSIX qw(ctime);
 
-my $__next_id = 0;
-
 sub new {
     my $class = shift;
     my $time = time;
     my $timestr = ctime($time);
     $timestr =~ s/\n$//;
     my %args = (
-        id        => $__next_id++,
         deleted   => 0,
         time      => $timestr,
         _time     => $time,
         direction => 'none',
         @_);
+    unless(exists($args{id})) {
+        my $msglist = BarnOwl::message_list();
+        $args{id} = $msglist->next_id;
+    }
     if(exists $args{loginout} && !exists $args{login}) {
         $args{login} = $args{loginout};
         delete $args{loginout};

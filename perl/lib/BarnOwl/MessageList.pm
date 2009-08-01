@@ -3,6 +3,12 @@ use warnings;
 
 package BarnOwl::MessageList;
 
+my $__next_id = 0;
+
+sub next_id {
+    return $__next_id++;
+}
+
 sub new {
     my $class = shift;
     my $self = {messages => {}};
