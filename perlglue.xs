@@ -334,6 +334,15 @@ remove_dispatch(fd)
 	CODE:
 	owl_select_remove_perl_dispatch(fd);
 
+
+SV*
+message_list()
+	CODE:
+		RETVAL = newSVsv(owl_global_get_msglist(&g));
+	OUTPUT:
+		RETVAL
+
+
 MODULE = BarnOwl		PACKAGE = BarnOwl::Internal
 
 
