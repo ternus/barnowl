@@ -160,6 +160,8 @@ is the result of formatting the message for display.
 # switch, if present.
 our $configfile;
 
+our @__startup_errors = ();
+
 if(!$configfile && -f $ENV{HOME} . "/.barnowlconf") {
     $configfile = $ENV{HOME} . "/.barnowlconf";
 }

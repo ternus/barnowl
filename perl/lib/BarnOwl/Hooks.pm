@@ -127,6 +127,11 @@ sub _load_owlconf {
 # with compatibility by calling the old, fixed-name hooks.
 
 sub _startup {
+    for my $e (@BarnOwl::__startup_errors) {
+        BarnOwl::admin_message('Startup', $e);
+    }
+    @BarnOwl::__startup_errors = ();
+    
     _load_perl_commands();
     _load_owlconf();
 
