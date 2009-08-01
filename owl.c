@@ -313,18 +313,20 @@ int main(int argc, char **argv, char **env)
   tw=owl_global_get_typwin(&g);
 
   /* welcome message */
-  owl_function_debugmsg("startup: creating splash message");
-  owl_function_adminmsg("",
-    "-----------------------------------------------------------------------\n"
-    "Welcome to barnowl version " OWL_VERSION_STRING ".  Press 'h' for on-line help.\n"
-    "To see a quick introduction, type ':show quickstart'.                  \n"
-    "                                                                       \n"
-    "BarnOwl is free software. Type ':show license' for more                \n"
-    "information.                                                     ^ ^   \n"
-    "                                                                 OvO   \n"
-    "Please report any bugs or suggestions to bug-barnowl@mit.edu    (   )  \n"
-    "-----------------------------------------------------------------m-m---\n"
-  );
+  if(owl_messagelist_get_size(owl_global_get_msglist(&g)) == 0) {
+      owl_function_debugmsg("startup: creating splash message");
+      owl_function_adminmsg("",
+        "-----------------------------------------------------------------------\n"
+        "Welcome to barnowl version " OWL_VERSION_STRING ".  Press 'h' for on-line help.\n"
+        "To see a quick introduction, type ':show quickstart'.                  \n"
+        "                                                                       \n"
+        "BarnOwl is free software. Type ':show license' for more                \n"
+        "information.                                                     ^ ^   \n"
+        "                                                                 OvO   \n"
+        "Please report any bugs or suggestions to bug-barnowl@mit.edu    (   )  \n"
+        "-----------------------------------------------------------------m-m---\n"
+        );
+  }
   sepbar(NULL);
 
   /* process the startup file */
