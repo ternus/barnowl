@@ -72,6 +72,7 @@ sub set_meta {
     my $key = shift;
     my $val = shift;
     $self->{__meta}{$key} = $val;
+    undef $self->{__fmtext};
     BarnOwl::View->consider_message($self);
 }
 
