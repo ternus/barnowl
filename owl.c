@@ -219,7 +219,9 @@ int main(int argc, char **argv, char **env)
   if (tty) {
     owl_global_set_tty(&g, tty);
   } else {
-    owl_global_set_tty(&g, owl_util_get_default_tty());
+    char *tty = owl_util_get_default_tty();
+    owl_global_set_tty(&g, tty);
+    free(tty);
   }
 
   /* Initialize perl */
