@@ -135,7 +135,7 @@ sub fill_back {
 
 loop_done:
     $ml->iterate_done;
-    debug {"[@{[$self->get_filter]}]" . $self->ranges->string_chain};
+    debug {"[@{[$self->get_filter]}]" . $self->{ranges}->string_chain};
 }
 
 sub fill_forward {
@@ -169,7 +169,7 @@ sub fill_forward {
 
 loop_done:
     $ml->iterate_done;
-    debug {"[@{[$self->get_filter]}]" . $self->ranges->string_chain};
+    debug {"[@{[$self->get_filter]}]" . $self->{ranges}->string_chain};
 }
 
 sub invalidate_filter {
