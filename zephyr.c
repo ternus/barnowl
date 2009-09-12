@@ -1315,11 +1315,13 @@ void owl_zephyr_process_events(owl_dispatch *d) {
       /* is this an ack from a zephyr we sent? */
       if (owl_zephyr_notice_is_ack(&notice)) {
         owl_zephyr_handle_ack(&notice);
+        ZFreeNotice(&notice);
         continue;
       }
 
       /* if it's a ping and we're not viewing pings then skip it */
       if (!owl_global_is_rxping(&g) && !strcasecmp(notice.z_opcode, "ping")) {
+        ZFreeNotice(&notice);
         continue;
       }
 
@@ -1328,6 +1330,8 @@ void owl_zephyr_process_events(owl_dispatch *d) {
       owl_message_create_from_znotice(m, &notice);
 
       owl_global_messagequeue_addmsg(&g, m);
+
+      ZFreeNotice(&notice);
     }
   }
 }
