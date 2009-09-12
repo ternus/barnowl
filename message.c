@@ -44,9 +44,11 @@ SV* owl_message_get_attribute_internal(owl_message *m, char *attrname)
  */
 void owl_message_set_attribute(owl_message *m, char *attrname, char *attrvalue)
 {
-  char *argv[] = {attrname, attrvalue, NULL};
+  char *utf8val = owl_validate_or_convert(attrvalue);
+  char *argv[] = {attrname, utf8val, NULL};
   char *rv = owl_perlconfig_message_call_method(m, "__set_attribute", 2, argv);
   if(rv) owl_free(rv);
+  owl_free(utf8val);
 }
 
 /* return the value associated with the named attribute, or NULL if
