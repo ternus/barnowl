@@ -318,7 +318,7 @@ char *owl_message_get_shorttimestr(owl_message *m)
   tmstruct=localtime(&time);
   out=owl_sprintf("%2.2i:%2.2i", tmstruct->tm_hour, tmstruct->tm_min);
   if (out) return(out);
-  return("??:??");
+  return owl_strdup("??:??");
 }
 
 void owl_message_set_type_admin(owl_message *m)
