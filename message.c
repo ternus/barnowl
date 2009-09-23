@@ -791,7 +791,7 @@ char *owl_message_get_field(owl_message *m, int n)
   if(!ref_fields || !SvROK(ref_fields)) return "";
   fields = (AV*)SvRV(ref_fields);
   f = av_fetch(fields, n, 0);
-  if(!f) return "";
+  if(!f) return owl_strdup("");
   return owl_strdup(SvPV_nolen(*f));
 }
 #else
