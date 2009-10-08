@@ -743,8 +743,8 @@ void owl_message_create_from_znotice(owl_message *m, ZNotice_t *n)
   av_zfields = newAV();
   j=owl_zephyr_get_num_fields(n);
   for (i=0; i<j; i++) {
-    ptr=owl_zephyr_get_field(n, i+1);
-    av_push(av_zfields, newSVpvn(ptr, strlen(ptr)));
+    ptr=owl_zephyr_get_field_as_utf8(n, i+1);
+    av_push(av_zfields, owl_new_sv(ptr));
     owl_free(ptr);
   }
   (void)hv_store((HV*)SvRV(m), "fields", strlen("fields"), newRV_noinc((SV*)av_zfields), 0);
