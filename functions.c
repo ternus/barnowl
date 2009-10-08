@@ -3579,6 +3579,10 @@ void owl_function_swap_cur_marked()
                             owl_global_get_current_view(&g),
                             marked_id);
 
+  if(owl_view_iterator_is_at_end(owl_global_get_curmsg(&g))) {
+    owl_view_iterator_prev(owl_global_get_curmsg(&g));
+  }
+
   owl_mainwin_redisplay(owl_global_get_mainwin(&g));
   owl_global_set_direction_downwards(&g);
 }
