@@ -8,6 +8,8 @@ sub debug(&) {goto \&BarnOwl::View::debug}
 sub view {return shift->{view}}
 sub index {return shift->{index}}
 
+our ($i, $v);
+
 sub new {
     my $class = shift;
     my $self = {
@@ -126,20 +128,16 @@ sub fill_forward {
 sub fixup {
     my $self = shift;
 
-    # This check is redudant, in that this is exactly the test that
-    # the below code would end up doing anyways. However, profiling
-    # reveals that fast-tracking the common case like this is a huge
-    # performance win, since this is probably /the/ the hottest piece
-    # of code path when walking views.
-    return 0 if $self->{index} < $self->range->next_fwd
-      && $self->{view}->message($self->{index});
+    local *i = \$self->{index};
+    local *v = \$self->{view};
 
-    return 1 if $self->fill_forward;
-
-    while(!$self->{view}->message($self->{index})) {
-        $self->{index}++;
+    do {
+        while($i < $self->range->next_fwd) {
+            return 0 if $v->message($i);
+            $i++;
+        }
         return 1 if $self->fill_forward;
-    }
+    } while(!$v->message($i));
     return 0;
 }
 
