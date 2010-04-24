@@ -3,6 +3,7 @@ use warnings;
 
 package BarnOwl::Style::Default;
 use POSIX qw(strftime);
+use Encode qw(decode);
 
 ################################################################################
 # Branching point for various formatting functions in this style.
@@ -73,6 +74,12 @@ sub format_admin {
     return "\@bold(OWL ADMIN)\n" . $self->indent_body($m);
 }
 
+sub is_mail_zephyr {
+    my $self = shift;
+    my $m = shift;
+    return $m->is_zephyr && ($m->class eq "MAIL");
+}
+
 sub format_chat {
     my $self = shift;
     my $m = shift;
@@ -127,6 +134,9 @@ sub indent_body
     my $m = shift;
 
     my $body = $m->body;
+    if ($self->is_mail_zephyr($m)) {
+      $body = decode('MIME-Header', $body);
+    }
     if ($m->{should_wordwrap}) {
       $body = BarnOwl::wordwrap($body, BarnOwl::getnumcols()-9);
     }
