@@ -1,10 +1,8 @@
 #include "owl.h"
 
-static const char fileIdent[] = "$Id$";
-
-static char * owl_filterelement_get_field(owl_message *m, char * field)
+static const char * owl_filterelement_get_field(const owl_message *m, const char * field)
 {
-  char *match;
+  const char *match;
   if (!strncmp(field, "meta:", 5)) {
     return owl_message_get_meta(m, field+5);
   }
@@ -27,6 +25,8 @@ static char * owl_filterelement_get_field(owl_message *m, char * field)
     match=owl_message_get_type(m);
   } else if (!strcasecmp(field, "hostname")) {
     match=owl_message_get_hostname(m);
+  } else if (!strcasecmp(field, "deleted")) {
+    match=owl_message_is_delete(m) ? "true" : "false";
   } else if (!strcasecmp(field, "direction")) {
     if (owl_message_is_direction_out(m)) {
       match="out";
@@ -45,25 +45,25 @@ static char * owl_filterelement_get_field(owl_message *m, char * field)
   return match;
 }
 
-static int owl_filterelement_match_false(owl_filterelement *fe, owl_message *m)
+static int owl_filterelement_match_false(const owl_filterelement *fe, const owl_message *m)
 {
   return 0;
 }
 
-static int owl_filterelement_match_true(owl_filterelement *fe, owl_message *m)
+static int owl_filterelement_match_true(const owl_filterelement *fe, const owl_message *m)
 {
   return 1;
 }
 
-static int owl_filterelement_match_re(owl_filterelement *fe, owl_message *m)
+static int owl_filterelement_match_re(const owl_filterelement *fe, const owl_message *m)
 {
-  char * val = owl_filterelement_get_field(m, fe->field);
-  return !owl_regex_compare(&(fe->re), val);
+  const char * val = owl_filterelement_get_field(m, fe->field);
+  return !owl_regex_compare(&(fe->re), val, NULL, NULL);
 }
 
-static int owl_filterelement_match_filter(owl_filterelement *fe, owl_message *m)
+static int owl_filterelement_match_filter(const owl_filterelement *fe, const owl_message *m)
 {
-  owl_filter *subfilter;
+  const owl_filter *subfilter;
   subfilter=owl_global_get_filter(&g, fe->field);
   if (!subfilter) {
     /* the filter does not exist, maybe because it was deleted.
@@ -74,9 +74,10 @@ static int owl_filterelement_match_filter(owl_filterelement *fe, owl_message *m)
   return owl_filter_message_match(subfilter, m);
 }
 
-static int owl_filterelement_match_perl(owl_filterelement *fe, owl_message *m)
+static int owl_filterelement_match_perl(const owl_filterelement *fe, const owl_message *m)
 {
-  char *subname, *perlrv;
+  const char *subname;
+  char *perlrv;
   int   tf=0;
 
   subname = fe->field;
@@ -93,7 +94,7 @@ static int owl_filterelement_match_perl(owl_filterelement *fe, owl_message *m)
   return tf;
 }
 
-static int owl_filterelement_match_group(owl_filterelement *fe, owl_message *m)
+static int owl_filterelement_match_group(const owl_filterelement *fe, const owl_message *m)
 {
   return owl_filterelement_match(fe->left, m);
 }
@@ -102,38 +103,38 @@ static int owl_filterelement_match_group(owl_filterelement *fe, owl_message *m)
    not. Do we care?
 */
 
-static int owl_filterelement_match_and(owl_filterelement *fe, owl_message *m)
+static int owl_filterelement_match_and(const owl_filterelement *fe, const owl_message *m)
 {
   return owl_filterelement_match(fe->left, m) &&
     owl_filterelement_match(fe->right, m);
 }
 
-static int owl_filterelement_match_or(owl_filterelement *fe, owl_message *m)
+static int owl_filterelement_match_or(const owl_filterelement *fe, const owl_message *m)
 {
   return owl_filterelement_match(fe->left, m) ||
     owl_filterelement_match(fe->right, m);
 }
 
-static int owl_filterelement_match_not(owl_filterelement *fe, owl_message *m)
+static int owl_filterelement_match_not(const owl_filterelement *fe, const owl_message *m)
 {
   return !owl_filterelement_match(fe->left, m);
 }
 
 /* Print methods */
 
-static void owl_filterelement_print_true(owl_filterelement *fe, GString *buf)
+static void owl_filterelement_print_true(const owl_filterelement *fe, GString *buf)
 {
   g_string_append(buf, "true");
 }
 
-static void owl_filterelement_print_false(owl_filterelement *fe, GString *buf)
+static void owl_filterelement_print_false(const owl_filterelement *fe, GString *buf)
 {
   g_string_append(buf, "false");
 }
 
-static void owl_filterelement_print_re(owl_filterelement *fe, GString *buf)
+static void owl_filterelement_print_re(const owl_filterelement *fe, GString *buf)
 {
-  char *re, *q;
+  const char *re, *q;
   g_string_append(buf, fe->field);
   g_string_append(buf, " ");
 
@@ -144,40 +145,40 @@ static void owl_filterelement_print_re(owl_filterelement *fe, GString *buf)
   g_string_append(buf, q);
 }
 
-static void owl_filterelement_print_filter(owl_filterelement *fe, GString *buf)
+static void owl_filterelement_print_filter(const owl_filterelement *fe, GString *buf)
 {
   g_string_append(buf, "filter ");
   g_string_append(buf, fe->field);
 }
 
-static void owl_filterelement_print_perl(owl_filterelement *fe, GString *buf)
+static void owl_filterelement_print_perl(const owl_filterelement *fe, GString *buf)
 {
   g_string_append(buf, "perl ");
   g_string_append(buf, fe->field);
 }
 
-static void owl_filterelement_print_group(owl_filterelement *fe, GString *buf)
+static void owl_filterelement_print_group(const owl_filterelement *fe, GString *buf)
 {
   g_string_append(buf, "( ");
   owl_filterelement_print(fe->left, buf) ;
   g_string_append(buf, " )");
 }
 
-static void owl_filterelement_print_or(owl_filterelement *fe, GString *buf)
+static void owl_filterelement_print_or(const owl_filterelement *fe, GString *buf)
 {
   owl_filterelement_print(fe->left, buf);
   g_string_append(buf, " or ");
   owl_filterelement_print(fe->right, buf);
 }
 
-static void owl_filterelement_print_and(owl_filterelement *fe, GString *buf)
+static void owl_filterelement_print_and(const owl_filterelement *fe, GString *buf)
 {
   owl_filterelement_print(fe->left, buf);
   g_string_append(buf, " and ");
   owl_filterelement_print(fe->right, buf);
 }
 
-static void owl_filterelement_print_not(owl_filterelement *fe, GString *buf)
+static void owl_filterelement_print_not(const owl_filterelement *fe, GString *buf)
 {
   g_string_append(buf, " not ");
   owl_filterelement_print(fe->left, buf);
@@ -208,12 +209,12 @@ void owl_filterelement_create_false(owl_filterelement *fe)
   fe->print_elt = owl_filterelement_print_false;
 }
 
-int owl_filterelement_create_re(owl_filterelement *fe, char *field, char *re)
+int owl_filterelement_create_re(owl_filterelement *fe, const char *field, const char *re)
 {
   owl_filterelement_create(fe);
   fe->field=owl_strdup(field);
   if(owl_regex_create(&(fe->re), re)) {
-    free(fe->field);
+    owl_free(fe->field);
     fe->field = NULL;
     return (-1);
   }
@@ -222,7 +223,7 @@ int owl_filterelement_create_re(owl_filterelement *fe, char *field, char *re)
   return 0;
 }
 
-void owl_filterelement_create_filter(owl_filterelement *fe, char *name)
+void owl_filterelement_create_filter(owl_filterelement *fe, const char *name)
 {
   owl_filterelement_create(fe);
   fe->field=owl_strdup(name);
@@ -230,7 +231,7 @@ void owl_filterelement_create_filter(owl_filterelement *fe, char *name)
   fe->print_elt = owl_filterelement_print_filter;
 }
 
-void owl_filterelement_create_perl(owl_filterelement *fe, char *name)
+void owl_filterelement_create_perl(owl_filterelement *fe, const char *name)
 {
   owl_filterelement_create(fe);
   fe->field=owl_strdup(name);
@@ -272,7 +273,7 @@ void owl_filterelement_create_or(owl_filterelement *fe, owl_filterelement *lhs, 
   fe->print_elt = owl_filterelement_print_or;
 }
 
-int owl_filterelement_match(owl_filterelement *fe, owl_message *m)
+int owl_filterelement_match(const owl_filterelement *fe, const owl_message *m)
 {
   if(!fe) return 0;
   if(!fe->match_message) return 0;
@@ -282,24 +283,24 @@ int owl_filterelement_match(owl_filterelement *fe, owl_message *m)
 static int fe_visiting = 0;
 static int fe_visited  = 1;
 
-int owl_filterelement_is_toodeep(owl_filter *f, owl_filterelement *fe)
+int owl_filterelement_is_toodeep(const owl_filter *f, const owl_filterelement *fe)
 {
   int rv;
   owl_dict filters;
   owl_dict_create(&filters);
 
-  owl_dict_insert_element(&filters, f->name, &fe_visiting, owl_dict_noop_free);
+  owl_dict_insert_element(&filters, f->name, &fe_visiting, owl_dict_noop_delete);
 
   rv = _owl_filterelement_is_toodeep(fe, &filters);
 
-  owl_dict_free_simple(&filters);
+  owl_dict_cleanup(&filters, NULL);
   return rv;
 }
 
-int _owl_filterelement_is_toodeep(owl_filterelement *fe, owl_dict *seen)
+int _owl_filterelement_is_toodeep(const owl_filterelement *fe, owl_dict *seen)
 {
   int rv = 0;
-  owl_filter *f;
+  const owl_filter *f;
 
   if(fe->match_message == owl_filterelement_match_filter) {
     int *nval = owl_dict_find_element(seen, fe->field);
@@ -307,9 +308,9 @@ int _owl_filterelement_is_toodeep(owl_filterelement *fe, owl_dict *seen)
       return 1;
     } else if (nval == NULL) {
       f = owl_global_get_filter(&g, fe->field);
-      owl_dict_insert_element(seen, fe->field, &fe_visiting, owl_dict_noop_free);
+      owl_dict_insert_element(seen, fe->field, &fe_visiting, owl_dict_noop_delete);
       if(f) rv = _owl_filterelement_is_toodeep(f->root, seen);
-      owl_dict_insert_element(seen, fe->field, &fe_visited, owl_dict_noop_free);
+      owl_dict_insert_element(seen, fe->field, &fe_visited, owl_dict_noop_delete);
     }
   } else {
     if(fe->left)
@@ -320,21 +321,21 @@ int _owl_filterelement_is_toodeep(owl_filterelement *fe, owl_dict *seen)
   return rv;
 }
 
-void owl_filterelement_free(owl_filterelement *fe)
+void owl_filterelement_cleanup(owl_filterelement *fe)
 {
   if (fe->field) owl_free(fe->field);
   if (fe->left) {
-    owl_filterelement_free(fe->left);
+    owl_filterelement_cleanup(fe->left);
     owl_free(fe->left);
   }
   if (fe->right) {
-    owl_filterelement_free(fe->right);
+    owl_filterelement_cleanup(fe->right);
     owl_free(fe->right);
   }
-  owl_regex_free(&(fe->re));
+  owl_regex_cleanup(&(fe->re));
 }
 
-void owl_filterelement_print(owl_filterelement *fe, GString *buf)
+void owl_filterelement_print(const owl_filterelement *fe, GString *buf)
 {
   if(!fe || !fe->print_elt) return;
   fe->print_elt(fe, buf);

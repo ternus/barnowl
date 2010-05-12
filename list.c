@@ -1,40 +1,39 @@
 #include "owl.h"
 #include <stdlib.h>
 
-static const char fileIdent[] = "$Id$";
-
 #define INITSIZE 10
-#define GROWBY 1.5
+#define GROWBY 3 / 2
 
 int owl_list_create(owl_list *l)
 {
   l->size=0;
-  l->list=(void **)owl_malloc(INITSIZE*sizeof(void *));
+  l->list=owl_malloc(INITSIZE*sizeof(void *));
   l->avail=INITSIZE;
   if (l->list==NULL) return(-1);
   return(0);
 }
 
-int owl_list_get_size(owl_list *l)
+int owl_list_get_size(const owl_list *l)
 {
   return(l->size);
 }
 
 
-void owl_list_grow(owl_list *l, int n) /*noproto*/
+static void owl_list_grow(owl_list *l, int n)
 {
   void *ptr;
 
   if ((l->size+n) > l->avail) {
-    ptr=owl_realloc(l->list, l->avail*GROWBY*sizeof(void *));
+    int avail = MAX(l->avail * GROWBY, l->size + n);
+    ptr = owl_realloc(l->list, avail * sizeof(void *));
     if (ptr==NULL) abort();
     l->list=ptr;
-    l->avail=l->avail*GROWBY;
+    l->avail = avail;
   }
 
 }
 
-void *owl_list_get_element(owl_list *l, int n)
+void *owl_list_get_element(const owl_list *l, int n)
 {
   if (n>l->size-1) return(NULL);
   return(l->list[n]);
@@ -77,69 +76,14 @@ int owl_list_remove_element(owl_list *l, int n)
   return(0);
 }
 
-void owl_list_free_all(owl_list *l, void (*elefree)(void *))
+void owl_list_cleanup(owl_list *l, void (*elefree)(void *))
 {
   int i;
 
-  for (i=0; i<l->size; i++) {
-    (elefree)(l->list[i]);
+  if (elefree) {
+    for (i = 0; i < l->size; i++) {
+      (elefree)(l->list[i]);
+    }
   }
   owl_free(l->list);
 }
-
-void owl_list_free_simple(owl_list *l)
-{
-  if (l->list) owl_free(l->list);
-}
-
-/************* REGRESSION TESTS **************/
-#ifdef OWL_INCLUDE_REG_TESTS
-
-#include "test.h"
-
-int owl_list_regtest(void) {
-  int numfailed=0;
-  owl_list l;
-  intptr_t i;
-
-  printf("# BEGIN testing owl_list\n");
-
-  FAIL_UNLESS("create", 0 == owl_list_create(&l));
-  for(i=0;i<10;i++) {
-    FAIL_UNLESS("insert", 0 == owl_list_append_element(&l, (void*)i));
-  }
-
-  FAIL_UNLESS("size", 10 == owl_list_get_size(&l));
-
-  for(i=0;i<10;i++) {
-    FAIL_UNLESS("get", i == (intptr_t)owl_list_get_element(&l, i));
-  }
-
-  for(i=0;i<10;i++) {
-    FAIL_UNLESS("append tail", 0 == owl_list_append_element(&l, (void*)(10+i)));
-  }
-
-  FAIL_UNLESS("size", 20 == owl_list_get_size(&l));
-
-  for(i=10;i<20;i++) {
-    FAIL_UNLESS("get", i == (intptr_t)owl_list_get_element(&l, i));
-  }
-
-  for(i=9;i>=0;i--) {
-    FAIL_UNLESS("prepend", 0 == owl_list_prepend_element(&l, (void*)(-i)));
-  }
-
-  FAIL_UNLESS("size", 30 == owl_list_get_size(&l));
-
-  for(i=0;i<10;i++) {
-    FAIL_UNLESS("get beg", -i == (intptr_t)owl_list_get_element(&l, i));
-    FAIL_UNLESS("get mid", i == (intptr_t)owl_list_get_element(&l, 10+i));
-    FAIL_UNLESS("get end", 10+i == (intptr_t)owl_list_get_element(&l, 20+i));
-  }
-  
-  printf("# END testing owl_list\n");
-
-  return numfailed;
-}
-
-#endif /* OWL_INCLUDE_REG_TESTS */

@@ -1,12 +1,10 @@
 #include "owl.h"
 
-static const char fileIdent[] = "$Id$";
-
 #define BIND_CMD(kpress, command, desc) \
-         owl_keymap_create_binding(km, kpress, command, NULL, desc);
+         owl_keymap_create_binding(km, kpress, command, NULL, desc)
 
 #define BIND_FNV(kpress, fn, desc) \
-         owl_keymap_create_binding(km, kpress, NULL, fn, desc);
+         owl_keymap_create_binding(km, kpress, NULL, fn, desc)
 
 
 /* sets up the default keymaps */
@@ -22,7 +20,7 @@ void owl_keys_setup_keymaps(owl_keyhandler *kh) {
   km_global = km = owl_keyhandler_create_and_add_keymap(kh, "global",
        "System-wide default key bindings", 
        owl_keys_default_invalid, NULL, NULL);
-  BIND_CMD("C-z",      "suspend",            "Suspend owl");
+  BIND_CMD("C-z",      "message Use :suspend to suspend.", "");
 
   /****************************************************************/
   /***************************** EDIT *****************************/
@@ -83,6 +81,13 @@ void owl_keys_setup_keymaps(owl_keyhandler *kh) {
 
   BIND_CMD("M-q",         "edit:fill-paragraph", "");
 
+  BIND_CMD("C-@",         "edit:set-mark", "");
+  BIND_CMD("C-x C-x",     "edit:exchange-point-and-mark", "");
+
+  BIND_CMD("M-w",         "edit:copy-region-as-kill", "");
+  BIND_CMD("C-w",         "edit:kill-region", "");
+  BIND_CMD("C-y",         "edit:yank", "");
+
   BIND_CMD("C-l",         "( edit:recenter ; redisplay )", "");
 
 
@@ -95,22 +100,25 @@ void owl_keys_setup_keymaps(owl_keyhandler *kh) {
        owl_keys_editwin_default, NULL, owl_keys_editwin_postalways);
   owl_keymap_set_submap(km_ew_multi, km_editwin);
 
-  BIND_CMD("UP",      "editmulti:move-up-line", "");
-  BIND_CMD("M-[ A",   "editmulti:move-up-line", "");
-  BIND_CMD("C-p",     "editmulti:move-up-line", "");
-  BIND_CMD("DOWN",    "editmulti:move-down-line", "");
-  BIND_CMD("M-[ B",   "editmulti:move-down-line", "");
-  BIND_CMD("C-n",     "editmulti:move-down-line", "");
+  BIND_CMD("UP",      "edit:move-up-line", "");
+  BIND_CMD("M-[ A",   "edit:move-up-line", "");
+  BIND_CMD("C-p",     "edit:move-up-line", "");
+  BIND_CMD("DOWN",    "edit:move-down-line", "");
+  BIND_CMD("M-[ B",   "edit:move-down-line", "");
+  BIND_CMD("C-n",     "edit:move-down-line", "");
+
+  BIND_CMD("M-}",     "edit:forward-paragraph", "");
+  BIND_CMD("M-{",     "edit:backward-paragraph", "");
 
   /* This would be nice, but interferes with C-c to cancel */
-  /*BIND_CMD("C-c C-c", "editmulti:done", "sends the zephyr");*/
+  /*BIND_CMD("C-c C-c", "edit:done", "sends the zephyr");*/
 
   BIND_CMD("M-p",         "edit:history-prev", "");
   BIND_CMD("M-n",         "edit:history-next", "");
 
   /* note that changing "disable-ctrl-d" to "on" will change this to 
    * edit:delete-next-char */
-  BIND_CMD("C-d",     "editmulti:done-or-delete", "sends the zephyr if at the end of the message");
+  BIND_CMD("C-d",     "edit:done-or-delete", "sends the zephyr if at the end of the message");
 
 
   /****************************************************************/
@@ -165,10 +173,12 @@ void owl_keys_setup_keymaps(owl_keyhandler *kh) {
   BIND_CMD("SPACE",       "popless:scroll-down-page", "");
   BIND_CMD("NPAGE",       "popless:scroll-down-page", "");
   BIND_CMD("M-n",         "popless:scroll-down-page", "");
+  BIND_CMD("C-v",         "popless:scroll-down-page", "");
 
   BIND_CMD("b",           "popless:scroll-up-page", "");
-  BIND_CMD("PPAGE",       "popless:scroll-up-page", "")
+  BIND_CMD("PPAGE",       "popless:scroll-up-page", "");
   BIND_CMD("M-p",         "popless:scroll-up-page", "");
+  BIND_CMD("M-v",         "popless:scroll-up-page", "");
 
   BIND_CMD("CR",          "popless:scroll-down-line", "");
   BIND_CMD("LF",          "popless:scroll-down-line", "");
@@ -235,11 +245,14 @@ void owl_keys_setup_keymaps(owl_keyhandler *kh) {
   BIND_CMD("!",   "view -r",          "invert the current view filter");
   BIND_CMD("M-n", "smartnarrow",      "narrow to a view based on the current message");
   BIND_CMD("M-N", "smartnarrow -i",   "narrow to a view based on the current message, and consider instance pair");
+  BIND_CMD("M-m", "smartnarrow -r",   "like M-n but with 'narrow-related' temporarily flipped.");
+  BIND_CMD("M-M", "smartnarrow -ri",  "like M-N but with 'narrow-related' temporarily flipped.");
   BIND_CMD("M-p", "view personal", "");
   
   BIND_CMD("/",   "start-command search ", "start a search command");
   BIND_CMD("?",   "start-command search -r ", "start a reverse search command");
 
+  BIND_CMD("HOME",   "recv:setshift 0","move the display all the way left");
   BIND_CMD("LEFT",   "recv:shiftleft", "");
   BIND_CMD("M-[ D",  "recv:shiftleft", "");
   BIND_CMD("RIGHT",  "recv:shiftright","");
@@ -300,12 +313,6 @@ void owl_keys_setup_keymaps(owl_keyhandler *kh) {
 
   BIND_CMD("C-c",  "",                "no effect in this mode");
   BIND_CMD("C-g",  "",                "no effect in this mode");
-
-
-  /**********************/
-
-  owl_function_activate_keymap("recv");
-
 }
 
 
@@ -335,10 +342,11 @@ void owl_keys_editwin_postalways(owl_input j) {
 
 void owl_keys_popless_postalways(owl_input j) {
   owl_viewwin *v = owl_global_get_viewwin(&g);
-  owl_popwin *pw = owl_global_get_popwin(&g);
+  const owl_popwin *pw = owl_global_get_popwin(&g);
 
   if (pw && owl_popwin_is_active(pw) && v) {
-    owl_viewwin_redisplay(v, 1);
+    owl_viewwin_redisplay(v);
+    owl_global_set_needrefresh(&g);
   }  
 }
 

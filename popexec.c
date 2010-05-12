@@ -7,16 +7,14 @@
 #endif
 #include <sys/wait.h>
 
-static const char fileIdent[] = "$Id$";
-
 /* starts up popexec in a new viewwin */
-owl_popexec *owl_popexec_new(char *command)
+owl_popexec *owl_popexec_new(const char *command)
 {
   owl_popexec *pe;
   owl_popwin *pw;
   owl_viewwin *v;
   int pipefds[2], child_write_fd, parent_read_fd;
-  int pid;
+  pid_t pid;
 
   pe = owl_malloc(sizeof(owl_popexec));
   if (!pe) return NULL;
@@ -28,11 +26,11 @@ owl_popexec *owl_popexec_new(char *command)
   pe->vwin=v=owl_global_get_viewwin(&g);
 
   owl_popwin_up(pw);
+  owl_global_push_context(&g, OWL_CTX_POPLESS, v, "popless");
   owl_viewwin_init_text(v, owl_popwin_get_curswin(pw),
 			owl_popwin_get_lines(pw), owl_popwin_get_cols(pw),
 			"");
-  owl_popwin_refresh(pw);
-  owl_viewwin_redisplay(v, 0);
+  owl_viewwin_redisplay(v);
   owl_global_set_needrefresh(&g);
   owl_viewwin_set_onclose_hook(v, owl_popexec_viewwin_onclose, pe);
   pe->refcount++;
@@ -54,15 +52,10 @@ owl_popexec *owl_popexec_new(char *command)
     /* still in owl */
     pe->pid=pid;
     pe->winactive=1;
-    pe->dispatch.fd = parent_read_fd;
-    pe->dispatch.cfunc = owl_popexec_inputhandler;
-    pe->dispatch.destroy = owl_popexec_free_dispatch;
-    pe->dispatch.data = pe;
-    owl_select_add_dispatch(&pe->dispatch);
+    pe->dispatch = owl_select_add_io_dispatch(parent_read_fd, OWL_IO_READ|OWL_IO_EXCEPT, &owl_popexec_inputhandler, &owl_popexec_delete_dispatch, pe);
     pe->refcount++;
   } else {
     /* in the child process */
-    char *argv[4];
     int i;
     int fdlimit = sysconf(_SC_OPEN_MAX);
 
@@ -73,20 +66,16 @@ owl_popexec *owl_popexec_new(char *command)
     dup2(child_write_fd, 2 /*stderr*/);
     close(child_write_fd);
 
-    argv[0] = "sh";
-    argv[1] = "-c";
-    argv[2] = command;
-    argv[3] = 0;
-    execv("/bin/sh", argv);
+    execl("/bin/sh", "sh", "-c", command, (const char *)NULL);
     _exit(127);
   }
 
   return pe;
 }
 
-void owl_popexec_inputhandler(owl_dispatch *d)
+void owl_popexec_inputhandler(const owl_io_dispatch *d, void *data)
 {
-  owl_popexec *pe = d->data;
+  owl_popexec *pe = data;
   int navail, bread, rv_navail;
   char *buf;
   int status;
@@ -105,11 +94,12 @@ void owl_popexec_inputhandler(owl_dispatch *d)
 
   /* the viewwin has closed */
   if (!pe->pid && !pe->winactive) {
-    owl_select_remove_dispatch(d->fd);
+    owl_select_remove_io_dispatch(d);
+    pe->dispatch = NULL;
     return;
   }
 
-  if (0 != (rv_navail = ioctl(d->fd, FIONREAD, (void*)&navail))) {
+  if (0 != (rv_navail = ioctl(d->fd, FIONREAD, &navail))) {
     owl_function_debugmsg("ioctl error");
   }
 
@@ -120,9 +110,11 @@ void owl_popexec_inputhandler(owl_dispatch *d)
     pe->pid = 0;
     if (pe->winactive) { 
       owl_viewwin_append_text(pe->vwin, "\n");
-      owl_viewwin_redisplay(pe->vwin, 1);
+      owl_viewwin_redisplay(pe->vwin);
+      owl_global_set_needrefresh(&g);
     }
-    owl_select_remove_dispatch(d->fd);
+    owl_select_remove_io_dispatch(d);
+    pe->dispatch = NULL;
     return;
   }
 
@@ -146,13 +138,14 @@ void owl_popexec_inputhandler(owl_dispatch *d)
   owl_function_debugmsg("got data:  <%s>", buf);
   if (pe->winactive) {
     owl_viewwin_append_text(pe->vwin, buf);
-    owl_viewwin_redisplay(pe->vwin, 1);
+    owl_viewwin_redisplay(pe->vwin);
+    owl_global_set_needrefresh(&g);
   }
   owl_free(buf);
   
 }
 
-void owl_popexec_free_dispatch(owl_dispatch *d)
+void owl_popexec_delete_dispatch(const owl_io_dispatch *d)
 {
   owl_popexec *pe = d->data;
   close(d->fd);
@@ -161,12 +154,13 @@ void owl_popexec_free_dispatch(owl_dispatch *d)
 
 void owl_popexec_viewwin_onclose(owl_viewwin *vwin, void *data)
 {
-  owl_popexec *pe = (owl_popexec*)data;
+  owl_popexec *pe = data;
   int status, rv;
 
   pe->winactive = 0;
-  if (pe->dispatch.fd>0) {
-    owl_select_remove_dispatch(pe->dispatch.fd);
+  if (pe->dispatch) {
+    owl_select_remove_io_dispatch(pe->dispatch);
+    pe->dispatch = NULL;
   }
   if (pe->pid) {
     /* TODO: we should handle the case where SIGTERM isn't good enough */

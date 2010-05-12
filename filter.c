@@ -1,25 +1,28 @@
 #include <string.h>
 #include "owl.h"
 
-static const char fileIdent[] = "$Id$";
-
-int owl_filter_init_fromstring(owl_filter *f, char *name, char *string)
+owl_filter *owl_filter_new_fromstring(const char *name, const char *string)
 {
+  owl_filter *f;
   char **argv;
-  int argc, out;
+  int argc;
 
-  argv=owl_parseline(string, &argc);
-  out=owl_filter_init(f, name, argc, argv);
-  owl_parsefree(argv, argc);
-  return(out);
+  argv = owl_parseline(string, &argc);
+  f = owl_filter_new(name, argc, strs(argv));
+  owl_parse_delete(argv, argc);
+
+  return f;
 }
 
-int owl_filter_init(owl_filter *f, char *name, int argc, char **argv)
+owl_filter *owl_filter_new(const char *name, int argc, const char *const *argv)
 {
+  owl_filter *f;
+
+  f = owl_malloc(sizeof(owl_filter));
+
   f->name=owl_strdup(name);
   f->fgcolor=OWL_COLOR_DEFAULT;
   f->bgcolor=OWL_COLOR_DEFAULT;
-  f->cachedmsgid=-1;
 
   /* first take arguments that have to come first */
   /* set the color */
@@ -41,23 +44,25 @@ int owl_filter_init(owl_filter *f, char *name, int argc, char **argv)
     argv+=2;
   }
 
-  if(!(f->root = owl_filter_parse_expression(argc, argv, NULL)))
-    return(-1);
+  if (!(f->root = owl_filter_parse_expression(argc, argv, NULL))) {
+    owl_filter_delete(f);
+    return NULL;
+  }
 
   /* Now check for recursion. */
   if (owl_filter_is_toodeep(f)) {
     owl_function_error("Filter loop!");
-    owl_filter_free(f);
-    return(-1);
+    owl_filter_delete(f);
+    return NULL;
   }
 
-  return(0);
+  return f;
 }
 
 
 /* A primitive expression is one without any toplevel ``and'' or ``or''s*/
 
-static owl_filterelement * owl_filter_parse_primitive_expression(int argc, char **argv, int *next)
+static owl_filterelement * owl_filter_parse_primitive_expression(int argc, const char *const *argv, int *next)
 {
   owl_filterelement *fe, *op;
   int i = 0, skip;
@@ -108,12 +113,12 @@ static owl_filterelement * owl_filter_parse_primitive_expression(int argc, char 
   }
   return fe;
 err:
-  owl_filterelement_free(fe);
+  owl_filterelement_cleanup(fe);
   owl_free(fe);
   return NULL;
 }
 
-owl_filterelement * owl_filter_parse_expression(int argc, char **argv, int *next)
+owl_filterelement * owl_filter_parse_expression(int argc, const char *const *argv, int *next)
 {
   int i = 0, skip;
   owl_filterelement * op1 = NULL, * op2 = NULL, *tmp;
@@ -146,15 +151,20 @@ owl_filterelement * owl_filter_parse_expression(int argc, char **argv, int *next
   return op1;
 err:
   if(op1) {
-    owl_filterelement_free(op1);
+    owl_filterelement_cleanup(op1);
     owl_free(op1);
   }
   return NULL;
 }
 
-char *owl_filter_get_name(owl_filter *f)
+const char *owl_filter_get_name(const owl_filter *f)
 {
   return(f->name);
+}
+
+SV *owl_filter_to_sv(const owl_filter *f)
+{
+  return owl_new_sv(owl_filter_get_name(f));
 }
 
 void owl_filter_set_fgcolor(owl_filter *f, int color)
@@ -162,7 +172,7 @@ void owl_filter_set_fgcolor(owl_filter *f, int color)
   f->fgcolor=color;
 }
 
-int owl_filter_get_fgcolor(owl_filter *f)
+int owl_filter_get_fgcolor(const owl_filter *f)
 {
   return(f->fgcolor);
 }
@@ -172,25 +182,15 @@ void owl_filter_set_bgcolor(owl_filter *f, int color)
   f->bgcolor=color;
 }
 
-int owl_filter_get_bgcolor(owl_filter *f)
+int owl_filter_get_bgcolor(const owl_filter *f)
 {
   return(f->bgcolor);
-}
-
-void owl_filter_set_cachedmsgid(owl_filter *f, int cachedmsgid)
-{
-  f->cachedmsgid=cachedmsgid;
-}
-
-int owl_filter_get_cachedmsgid(owl_filter *f)
-{
-  return(f->cachedmsgid);
 }
 
 /* return 1 if the message matches the given filter, otherwise
  * return 0.
  */
-int owl_filter_message_match(owl_filter *f, owl_message *m)
+int owl_filter_message_match(const owl_filter *f, const owl_message *m)
 {
   int ret;
   if(!f->root) return 0;
@@ -199,7 +199,7 @@ int owl_filter_message_match(owl_filter *f, owl_message *m)
 }
 
 
-char* owl_filter_print(owl_filter *f)
+char* owl_filter_print(const owl_filter *f)
 {
   GString *out = g_string_new("");
 
@@ -232,7 +232,7 @@ char* owl_filter_print(owl_filter *f)
 }
 
 /* Return 1 if the filters 'a' and 'b' are equivalent, 0 otherwise */
-int owl_filter_equiv(owl_filter *a, owl_filter *b)
+int owl_filter_equiv(const owl_filter *a, const owl_filter *b)
 {
   char *buffa, *buffb;
   int ret;
@@ -251,112 +251,20 @@ int owl_filter_equiv(owl_filter *a, owl_filter *b)
 }
 
 
-int owl_filter_is_toodeep(owl_filter *f)
+int owl_filter_is_toodeep(const owl_filter *f)
 {
   return owl_filterelement_is_toodeep(f, f->root);
 }
 
-void owl_filter_free(owl_filter *f)
+void owl_filter_delete(owl_filter *f)
 {
-  if(f->root) {
-    owl_filterelement_free(f->root);
+  if (f == NULL)
+    return;
+  if (f->root) {
+    owl_filterelement_cleanup(f->root);
     owl_free(f->root);
   }
-  if (f->name) owl_free(f->name);
+  if (f->name)
+    owl_free(f->name);
+  owl_free(f);
 }
-
-/**************************************************************************/
-/************************* REGRESSION TESTS *******************************/
-/**************************************************************************/
-
-#ifdef OWL_INCLUDE_REG_TESTS
-
-int owl_filter_test_string(char * filt, owl_message *m, int shouldmatch) /* noproto */ {
-  owl_filter f;
-  int ok;
-  int failed = 0;
-  if(owl_filter_init_fromstring(&f, "test-filter", filt)) {
-    printf("not ok can't parse %s\n", filt);
-    failed = 1;
-    goto out;
-  }
-  ok = owl_filter_message_match(&f, m);
-  if((shouldmatch && !ok) || (!shouldmatch && ok)) {
-    printf("not ok match %s (got %d, expected %d)\n", filt, ok, shouldmatch);
-    failed = 1;
-  }
- out:
-  owl_filter_free(&f);
-  if(!failed) {
-    printf("ok %s %s\n", shouldmatch ? "matches" : "doesn't match", filt);
-  }
-  return failed;
-}
-
-
-#include "test.h"
-
-
-int owl_filter_regtest(void) {
-  int numfailed=0;
-  owl_message *m = owl_message_new();;
-  owl_filter f1, f2, f3, f4, f5;
-
-  owl_list_create(&(g.filterlist));
-  owl_message_init(m);
-  owl_message_set_type_zephyr(m);
-  owl_message_set_direction_in(m);
-  owl_message_set_class(m, "owl");
-  owl_message_set_instance(m, "tester");
-  owl_message_set_sender(m, "owl-user");
-  owl_message_set_recipient(m, "joe");
-  owl_message_set_attribute(m, "foo", "bar");
-
-#define TEST_FILTER(f, e) numfailed += owl_filter_test_string(f, m, e)
-
-
-  TEST_FILTER("true", 1);
-  TEST_FILTER("false", 0);
-  TEST_FILTER("( true )", 1);
-  TEST_FILTER("not false", 1);
-  TEST_FILTER("( true ) or ( false )", 1);
-  TEST_FILTER("true and false", 0);
-  TEST_FILTER("( true or true ) or ( ( false ) )", 1);
-
-  TEST_FILTER("class owl", 1);
-  TEST_FILTER("class ^owl$", 1);
-  TEST_FILTER("instance test", 1);
-  TEST_FILTER("instance ^test$", 0);
-  TEST_FILTER("instance ^tester$", 1);
-
-  TEST_FILTER("foo bar", 1);
-  TEST_FILTER("class owl and instance tester", 1);
-  TEST_FILTER("type ^zephyr$ and direction ^in$ and ( class ^owl$ or instance ^owl$ )", 1);
-
-  /* Order of operations and precedence */
-  TEST_FILTER("not true or false", 0);
-  TEST_FILTER("true or true and false", 0);
-  TEST_FILTER("true and true and false or true", 1);
-  TEST_FILTER("false and false or true", 1);
-  TEST_FILTER("true and false or false", 0);
-
-  owl_filter_init_fromstring(&f1, "f1", "class owl");
-  owl_global_add_filter(&g, &f1);
-  TEST_FILTER("filter f1", 1);
-
-  /* Test recursion prevention */
-  FAIL_UNLESS("self reference", owl_filter_init_fromstring(&f2, "test", "filter test"));
-
-  /* mutual recursion */
-  owl_filter_init_fromstring(&f3, "f3", "filter f4");
-  owl_global_add_filter(&g, &f3);
-  FAIL_UNLESS("mutual recursion",   owl_filter_init_fromstring(&f4, "f4", "filter f3"));
-
-  /* support referencing a filter several times */
-  FAIL_UNLESS("DAG", !owl_filter_init_fromstring(&f5, "dag", "filter f1 or filter f1"));
-
-  return 0;
-}
-
-
-#endif /* OWL_INCLUDE_REG_TESTS */

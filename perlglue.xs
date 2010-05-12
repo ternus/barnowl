@@ -1,6 +1,4 @@
 /* -*- mode: c; indent-tabs-mode: t; c-basic-offset: 8 -*- */
-static const char fileIdent[] = "$Id$";
-
 #ifdef HAVE_LIBZEPHYR
 #include <zephyr/zephyr.h>
 #endif
@@ -8,12 +6,13 @@ static const char fileIdent[] = "$Id$";
 
 #define OWL_PERL
 #include "owl.h"
-SV *owl_perlconfig_curmessage2hashref(void);
 
 #define SV_IS_CODEREF(sv) (SvROK((sv)) && SvTYPE(SvRV((sv))) == SVt_PVCV)
 #define SV_IS_MESSAGE(sv) (SvROK((sv)) && \
 	SvTYPE(SvRV((sv))) == SVt_PVHV && \
 		sv_derived_from(sv, "BarnOwl::Message"))
+
+typedef char utf8;
 
 	/*************************************************************
 	 * NOTE
@@ -27,19 +26,19 @@ SV *owl_perlconfig_curmessage2hashref(void);
 	 * complex argument processing or something, we define a
 	 * simple version here that takes arguments in as flat a
 	 * manner as possible, to simplify the XS code, put it in
-	 * BarnOwl::Intenal::, and write a perl wrapper in BarnOwl.pm
+	 * BarnOwl::Internal::, and write a perl wrapper in BarnOwl.pm
 	 * that munges the arguments as appropriate and calls the
 	 * internal version.
 	 */
 
 MODULE = BarnOwl		PACKAGE = BarnOwl
 
-char *
+const utf8 *
 command(cmd, ...)
-	char *cmd
+	const char *cmd
 	PREINIT:
 		char *rv = NULL;
-		char **argv;
+		const char **argv;
 		int i;
 	CODE:
 	{
@@ -82,14 +81,14 @@ getidletime()
 	OUTPUT:
 		RETVAL
 
-char *
+const utf8 *
 zephyr_getrealm()
 	CODE:
 		RETVAL = owl_zephyr_get_realm();
 	OUTPUT:
 		RETVAL
 
-char *
+const utf8 *
 zephyr_getsender()
 	CODE:
 		RETVAL = owl_zephyr_get_sender();
@@ -98,16 +97,16 @@ zephyr_getsender()
 
 void
 zephyr_zwrite(cmd,msg)
-	char *cmd
-	char *msg
+	const char *cmd
+	const char *msg
 	PREINIT:
 		int i;
 	CODE:
 		i = owl_zwrite_create_and_send_from_line(cmd, msg);
 
-char *
+const utf8 *
 ztext_stylestrip(ztext)
-	char *ztext
+	const char *ztext
 	PREINIT:
 		char *rv = NULL;
 	CODE:
@@ -118,9 +117,9 @@ ztext_stylestrip(ztext)
 	CLEANUP:
 		if (rv) owl_free(rv);
 
-char *
+const utf8 *
 zephyr_smartstrip_user(in)
-	char *in
+	const char *in
 	PREINIT:
 		char *rv = NULL;
 	CODE:
@@ -133,7 +132,7 @@ zephyr_smartstrip_user(in)
 	CLEANUP:
 		owl_free(rv);
 
-char *
+const utf8 *
 zephyr_getsubs()
 	PREINIT:
 		char *rv = NULL;
@@ -145,7 +144,8 @@ zephyr_getsubs()
     CLEANUP:
 		if (rv) owl_free(rv);
 
-void queue_message(msg) 
+void
+queue_message(msg)
 	SV *msg
 	PREINIT:
 		owl_message *m;
@@ -161,90 +161,86 @@ void queue_message(msg)
 		owl_global_messagequeue_addmsg(&g, m);
 	}
 
-void admin_message(header, body) 
-	char *header
-	char *body
+void
+admin_message(header, body)
+	const char *header
+	const char *body
 	CODE:
 	{
 		owl_function_adminmsg(header, body);		
 	}
 
-void start_question(line, callback)
-	char *line
+void
+start_question(line, callback)
+	const char *line
 	SV *callback
 	PREINIT:
+		owl_editwin *e;
 	CODE:
 	{
 		if(!SV_IS_CODEREF(callback))
 			croak("Callback must be a subref");
 
-		owl_function_start_question(line);
+		e = owl_function_start_question(line);
 
-		SvREFCNT_inc(callback);
-		owl_editwin_set_cbdata(owl_global_get_typwin(&g), callback);
-		owl_editwin_set_callback(owl_global_get_typwin(&g), owl_perlconfig_edit_callback);
+		owl_editwin_set_cbdata(e,
+				       newSVsv(callback),
+				       owl_perlconfig_dec_refcnt);
+		owl_editwin_set_callback(e, owl_perlconfig_edit_callback);
 	}
 
-void start_password(line, callback)
-	char *line
+void
+start_password(line, callback)
+	const char *line
 	SV *callback
 	PREINIT:
+		owl_editwin *e;
 	CODE:
 	{
 		if(!SV_IS_CODEREF(callback))
 			croak("Callback must be a subref");
 
-		owl_function_start_password(line);
+		e = owl_function_start_password(line);
 
-		SvREFCNT_inc(callback);
-		owl_editwin_set_cbdata(owl_global_get_typwin(&g), callback);
-		owl_editwin_set_callback(owl_global_get_typwin(&g), owl_perlconfig_edit_callback);
+		owl_editwin_set_cbdata(e,
+				       newSVsv(callback),
+				       owl_perlconfig_dec_refcnt);
+		owl_editwin_set_callback(e, owl_perlconfig_edit_callback);
 	}
 
-void start_edit_win(line, callback)
-	char *line
+void
+start_edit_win(line, callback)
+	const char *line
 	SV *callback
-	PREINIT:
-		owl_editwin * e;
-		char buff[1024];
 	CODE:
 	{
 		if(!SV_IS_CODEREF(callback))
 			croak("Callback must be a subref");
 
-		e = owl_global_get_typwin(&g);
-		owl_editwin_new_style(e, OWL_EDITWIN_STYLE_MULTILINE,
-				      owl_global_get_msg_history(&g));
-		owl_editwin_clear(e);
-		owl_editwin_set_dotsend(e);
-		snprintf(buff, 1023, "----> %s\n", line);
-		owl_editwin_set_locktext(e, buff);
-
-		owl_global_set_typwin_active(&g);
-
-		SvREFCNT_inc(callback);
-		owl_editwin_set_cbdata(owl_global_get_typwin(&g), callback);
-		owl_editwin_set_callback(owl_global_get_typwin(&g), owl_perlconfig_edit_callback);
+		owl_function_start_edit_win(line,
+					    owl_perlconfig_edit_callback,
+					    newSVsv(callback),
+					    owl_perlconfig_dec_refcnt);
 	}
 
 
-char * 
+const char * 
 get_data_dir ()
 	CODE:
-		RETVAL = (char *) owl_get_datadir();
+		RETVAL = owl_get_datadir();
 	OUTPUT:
 	RETVAL
 
-char * 
+const char * 
 get_config_dir ()
 	CODE:
-		RETVAL = (char *) owl_global_get_confdir(&g);
+		RETVAL = owl_global_get_confdir(&g);
 	OUTPUT:
 	RETVAL	
 
 void
 popless_text(text) 
-	char *text
+	const char *text
 	CODE:
 	{
 		owl_function_popless_text(text);
@@ -252,19 +248,19 @@ popless_text(text)
 
 void
 popless_ztext(text) 
-	char *text
+	const char *text
 	CODE:
 	{
 		owl_fmtext fm;
 		owl_fmtext_init_null(&fm);
 		owl_fmtext_append_ztext(&fm, text);
 		owl_function_popless_fmtext(&fm);
-		owl_fmtext_free(&fm);
+		owl_fmtext_cleanup(&fm);
 	}
 
 void
 error(text) 
-	char *text
+	const char *text
 	CODE:
 	{
 		owl_function_error("%s", text);
@@ -272,22 +268,30 @@ error(text)
 
 void
 debug(text)
-	char *text
+	const char *text
 	CODE:
 	{
 		owl_function_debugmsg("%s", text);
 	}
 
 void
+message(text)
+	const char *text
+	CODE:
+	{
+		owl_function_makemsg("%s", text);
+	}
+
+void
 create_style(name, object)
-     char *name
+     const char *name
      SV  *object
      PREINIT:
 		owl_style *s;
      CODE:
 	{
 		s = owl_malloc(sizeof(owl_style));
-		owl_style_create_perl(s, name, object);
+		owl_style_create_perl(s, name, newSVsv(object));
 		owl_global_add_style(&g, s);
 	}
 
@@ -300,7 +304,7 @@ getnumcolors()
 
 void
 _remove_filter(filterName)
-	char *filterName
+	const char *filterName
 	CODE:
 	{
 		/* Don't delete the current view, or the 'all' filter */
@@ -332,9 +336,9 @@ filter_message_match(filterName, msg)
 	OUTPUT:
 		RETVAL
 
-char *
+const utf8 *
 wordwrap(in, cols)
-	char *in
+	const char *in
 	int cols
 	PREINIT:
 		char *rv = NULL;
@@ -344,27 +348,123 @@ wordwrap(in, cols)
 	OUTPUT:
 		RETVAL
 	CLEANUP:
-		if (rv) owl_free(rv);
+		if (rv)
+			owl_free(rv);
 
 void
-add_dispatch(fd, cb)
+remove_io_dispatch(fd)
 	int fd
-	SV * cb
 	CODE:
-        SvREFCNT_inc(cb);
-	owl_select_add_perl_dispatch(fd, cb);
+	owl_select_remove_perl_io_dispatch(fd);
+
+AV*
+all_filters()
+	PREINIT:
+		owl_list fl;
+	CODE:
+	{
+		owl_list_create(&fl);
+		owl_dict_get_keys(&g.filters, &fl);
+		RETVAL = owl_new_av(&fl, (SV*(*)(const void*))owl_new_sv);
+		sv_2mortal((SV*)RETVAL);
+		owl_list_cleanup(&fl, owl_free);
+	}
+	OUTPUT:
+		RETVAL
+
+AV*
+all_styles()
+	PREINIT:
+		owl_list l;
+	CODE:
+	{
+		owl_list_create(&l);
+		owl_global_get_style_names(&g, &l);
+		RETVAL = owl_new_av(&l, (SV*(*)(const void*))owl_new_sv);
+		sv_2mortal((SV*)RETVAL);
+	}
+	OUTPUT:
+		RETVAL
+	CLEANUP:
+		owl_list_cleanup(&l, owl_free);
+
+
+AV*
+all_variables()
+	PREINIT:
+		owl_list l;
+	CODE:
+	{
+		owl_list_create(&l);
+		owl_dict_get_keys(owl_global_get_vardict(&g), &l);
+		RETVAL = owl_new_av(&l, (SV*(*)(const void*))owl_new_sv);
+		sv_2mortal((SV*)RETVAL);
+	}
+	OUTPUT:
+		RETVAL
+	CLEANUP:
+		owl_list_cleanup(&l, owl_free);
+
+
+AV*
+all_keymaps()
+	PREINIT:
+		owl_list l;
+		const owl_keyhandler *kh;
+	CODE:
+	{
+		owl_list_create(&l);
+		kh = owl_global_get_keyhandler(&g);
+		owl_keyhandler_get_keymap_names(kh, &l);
+		RETVAL = owl_new_av(&l, (SV*(*)(const void*))owl_new_sv);
+		sv_2mortal((SV*)RETVAL);
+	}
+	OUTPUT:
+		RETVAL
+	CLEANUP:
+		owl_list_cleanup(&l, owl_free);
 
 void
-remove_dispatch(fd)
-	int fd
+redisplay()
 	CODE:
-	owl_select_remove_perl_dispatch(fd);
+	{
+		owl_messagelist_invalidate_formats(owl_global_get_msglist(&g));
+		owl_function_calculate_topmsg(OWL_DIRECTION_DOWNWARDS);
+		owl_mainwin_redisplay(owl_global_get_mainwin(&g));
+	}
+
+const char *
+get_zephyr_variable(name)
+	const char *name;
+	CODE:
+		RETVAL = owl_zephyr_get_variable(name);
+	OUTPUT:
+		RETVAL
+
+const utf8 *
+skiptokens(str, n)
+	const char *str;
+	int n;
+	CODE:
+		RETVAL = skiptokens(str, n);
+	OUTPUT:
+		RETVAL
 
 
 SV*
 message_list()
 	CODE:
 		RETVAL = newSVsv(owl_global_get_msglist(&g));
+	OUTPUT:
+		RETVAL
+
+
+MODULE = BarnOwl		PACKAGE = BarnOwl::Zephyr
+
+int
+have_zephyr()
+	CODE:
+		RETVAL = owl_global_is_havezephyr(&g);
 	OUTPUT:
 		RETVAL
 
@@ -386,9 +486,8 @@ new_command(name, func, summary, usage, description)
 		if(!SV_IS_CODEREF(func)) {
 			croak("Command function must be a coderef!");
 		}
-		SvREFCNT_inc(func);
 		cmd.name = name;
-		cmd.cmd_perl = func;
+		cmd.cmd_perl = newSVsv(func);
 		cmd.summary = summary;
 		cmd.usage = usage;
 		cmd.description = description;
@@ -405,10 +504,10 @@ new_command(name, func, summary, usage, description)
 
 void
 new_variable_string(name, ival, summ, desc)
-	char * name
-	char * ival
-	char * summ
-	char * desc
+	const char * name
+	const char * ival
+	const char * summ
+	const char * desc
 	CODE:
 	owl_variable_dict_newvar_string(owl_global_get_vardict(&g),
 					name,
@@ -418,10 +517,10 @@ new_variable_string(name, ival, summ, desc)
 
 void
 new_variable_int(name, ival, summ, desc)
-	char * name
+	const char * name
 	int ival
-	char * summ
-	char * desc
+	const char * summ
+	const char * desc
 	CODE:
 	owl_variable_dict_newvar_int(owl_global_get_vardict(&g),
 				     name,
@@ -431,16 +530,24 @@ new_variable_int(name, ival, summ, desc)
 
 void
 new_variable_bool(name, ival, summ, desc)
-	char * name
+	const char * name
 	int ival
-	char * summ
-	char * desc
+	const char * summ
+	const char * desc
 	CODE:
 	owl_variable_dict_newvar_bool(owl_global_get_vardict(&g),
 				      name,
 				      summ,
 				      desc,
 				      ival);
+
+void
+add_io_dispatch(fd, mode, cb)
+	int fd
+	int mode
+	SV * cb
+	CODE:
+	owl_select_add_perl_io_dispatch(fd, mode, newSVsv(cb));
 
 IV
 add_timer(after, interval, cb)
@@ -471,3 +578,144 @@ remove_timer(timer)
 		t = (owl_timer*)timer;
 		owl_function_debugmsg("Freeing timer %p", t);
 				owl_select_remove_timer(t);
+
+MODULE = BarnOwl		PACKAGE = BarnOwl::Editwin
+
+int
+replace(count, string)
+	int count;
+	const char *string;
+	PREINIT:
+		owl_editwin *e;
+	CODE:
+		e = owl_global_get_typwin(&g);
+		if (e) {
+			RETVAL = owl_editwin_replace(e, count, string);
+		} else {
+			RETVAL = 0;
+		}
+	OUTPUT:
+		RETVAL
+
+int
+point_move(delta)
+	int delta;
+	PREINIT:
+		owl_editwin *e;
+	CODE:
+		e = owl_global_get_typwin(&g);
+		if (e) {
+			RETVAL = owl_editwin_point_move(e, delta);
+		} else {
+			RETVAL = 0;
+		}
+	OUTPUT:
+		RETVAL
+
+int
+replace_region(string)
+	const char *string;
+	PREINIT:
+		owl_editwin *e;
+	CODE:
+		e = owl_global_get_typwin(&g);
+		if (e) {
+			RETVAL = owl_editwin_replace_region(e, string);
+		} else {
+			RETVAL = 0;
+		}
+	OUTPUT:
+		RETVAL
+
+const utf8 *
+get_region()
+	PREINIT:
+		char *region;
+		owl_editwin *e;
+	CODE:
+		e = owl_global_get_typwin(&g);
+		if (e) {
+			region = owl_editwin_get_region(owl_global_get_typwin(&g));
+		} else {
+			region = NULL;
+		}
+		RETVAL = region;
+	OUTPUT:
+		RETVAL
+	CLEANUP:
+		owl_free(region);
+
+SV *
+save_excursion(sub)
+	SV *sub;
+	PROTOTYPE: &
+	PREINIT:
+		int count;
+		owl_editwin *e;
+		owl_editwin_excursion *x;
+	CODE:
+	{
+		e = owl_global_get_typwin(&g);
+		if(!e)
+			croak("The edit window is not currently active!");
+
+		x = owl_editwin_begin_excursion(owl_global_get_typwin(&g));
+		PUSHMARK(SP);
+		count = call_sv(sub, G_SCALAR|G_EVAL|G_NOARGS);
+		SPAGAIN;
+		owl_editwin_end_excursion(owl_global_get_typwin(&g), x);
+
+		if(SvTRUE(ERRSV)) {
+			croak(NULL);
+		}
+
+		if(count == 1)
+			RETVAL = SvREFCNT_inc(POPs);
+		else
+			XSRETURN_UNDEF;
+
+	}
+	OUTPUT:
+		RETVAL
+
+int
+current_column()
+	PREINIT:
+		owl_editwin *e;
+	CODE:
+		e = owl_global_get_typwin(&g);
+		if (e) {
+			RETVAL = owl_editwin_current_column(e);
+		} else {
+			RETVAL = 0;
+		}
+	OUTPUT:
+		RETVAL
+
+int
+point()
+	PREINIT:
+		owl_editwin *e;
+	CODE:
+		e = owl_global_get_typwin(&g);
+		if (e) {
+			RETVAL = owl_editwin_get_point(e);
+		} else {
+			RETVAL = 0;
+		}
+	OUTPUT:
+		RETVAL
+
+int
+mark()
+	PREINIT:
+		owl_editwin *e;
+	CODE:
+		e = owl_global_get_typwin(&g);
+		if (e) {
+			RETVAL = owl_editwin_get_mark(e);
+		} else {
+			RETVAL = 0;
+		}
+	OUTPUT:
+		RETVAL

@@ -1,7 +1,5 @@
 #include "owl.h"
 
-static const char fileIdent[] = "$Id$";
-
 void owl_mainwin_init(owl_mainwin *mw)
 {
   mw->curtruncated=0;
@@ -12,20 +10,22 @@ void owl_mainwin_init(owl_mainwin *mw)
 void owl_mainwin_redisplay(owl_mainwin *mw)
 {
   owl_message *m;
-  int p, q, lines, isfull;
+  int lines, isfull;
   int x, y, savey, recwinlines, start;
   int fgcolor, bgcolor;
+  int markedmsgid;
   owl_view_iterator *topmsg, *curmsg, *iter;
   WINDOW *recwin;
-  owl_view *v;
-  owl_list *filtlist;
-  owl_filter *f;
+  const owl_view *v;
+  GList *fl;
+  const owl_filter *f;
 
   iter = owl_view_iterator_free_later(owl_view_iterator_new());
 
   recwin=owl_global_get_curs_recwin(&g);
   topmsg=owl_global_get_topmsg(&g);
   curmsg=owl_global_get_curmsg(&g);
+  markedmsgid = owl_global_get_markedmsgid(&g);
   v=owl_global_get_current_view(&g);
   owl_fmtext_reset_colorpairs();
 
@@ -53,7 +53,6 @@ void owl_mainwin_redisplay(owl_mainwin *mw)
       } */
     mw->curtruncated=0;
     owl_view_iterator_invalidate(mw->lastdisplayed);
-    wnoutrefresh(recwin);
     owl_global_set_needrefresh(&g);
     return;
   }
@@ -87,10 +86,8 @@ void owl_mainwin_redisplay(owl_mainwin *mw)
     /* if we match filters set the color */
     fgcolor=OWL_COLOR_DEFAULT;
     bgcolor=OWL_COLOR_DEFAULT;
-    filtlist=owl_global_get_filterlist(&g);
-    q=owl_list_get_size(filtlist);
-    for (p=0; p<q; p++) {
-      f=owl_list_get_element(filtlist, p);
+    for (fl = g.filterlist; fl; fl = g_list_next(fl)) {
+      f = fl->data;
       if ((owl_filter_get_fgcolor(f)!=OWL_COLOR_DEFAULT) ||
           (owl_filter_get_bgcolor(f)!=OWL_COLOR_DEFAULT)) {
         if (owl_filter_message_match(f, m)) {
@@ -134,16 +131,22 @@ void owl_mainwin_redisplay(owl_mainwin *mw)
 	} else {
 	  waddstr(recwin, "-");
 	}
-	if (!owl_message_is_delete(m)) {
-	  waddstr(recwin, ">");
-	} else {
+	if (owl_message_is_delete(m)) {
 	  waddstr(recwin, "D");
+	} else if (markedmsgid == owl_message_get_id(m)) {
+	  waddstr(recwin, "*");
+	} else {
+	  waddstr(recwin, ">");
 	}
 	wmove(recwin, y, x);
 	wattroff(recwin, A_BOLD);
       } else if (owl_message_is_delete(m)) {
 	wmove(recwin, savey, 0);
 	waddstr(recwin, " D");
+	wmove(recwin, y, x);
+      } else if (markedmsgid == owl_message_get_id(m)) {
+	wmove(recwin, savey, 0);
+	waddstr(recwin, " *");
 	wmove(recwin, y, x);
       }
     }
@@ -153,24 +156,23 @@ void owl_mainwin_redisplay(owl_mainwin *mw)
   /*  owl_view_iterator_prev(iter); */
   owl_view_iterator_clone(mw->lastdisplayed, iter);
 
-  wnoutrefresh(recwin);
   owl_global_set_needrefresh(&g);
 }
 
 
-int owl_mainwin_is_curmsg_truncated(owl_mainwin *mw)
+int owl_mainwin_is_curmsg_truncated(const owl_mainwin *mw)
 {
   if (mw->curtruncated) return(1);
   return(0);
 }
 
-int owl_mainwin_is_last_msg_truncated(owl_mainwin *mw)
+int owl_mainwin_is_last_msg_truncated(const owl_mainwin *mw)
 {
   if (mw->lasttruncated) return(1);
   return(0);
 }
 
-owl_view_iterator *owl_mainwin_get_last_msg(owl_mainwin *mw)
+owl_view_iterator *owl_mainwin_get_last_msg(const owl_mainwin *mw)
 {
   return mw->lastdisplayed;
 }

@@ -66,7 +66,8 @@ sub new {
     my $self  = {messages  => "",
                  filter    => $filter,
                  ranges    => undef,
-                 range     => undef};
+                 range     => undef,
+                 savedid   => -1};
     bless $self, $class;
     $self->reset;
     $view_cache{$filter} = $self;
@@ -175,6 +176,12 @@ loop_done:
 sub invalidate_filter {
     my $filter = shift;
     delete $view_cache{$filter};
+}
+
+sub saved_id {shift->{saved_id}}
+sub set_saved_id {
+    my $self = shift;
+    $self->{saved_id} = shift;
 }
 
 1;

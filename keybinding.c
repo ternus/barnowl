@@ -2,8 +2,6 @@
 #include <string.h>
 #include "owl.h"
 
-static const char fileIdent[] = "$Id$";
-
 /*
  * TODO: Idea for allowing functions to be user-specified --- 
  *      Have function have a context bitmask that says where it 
@@ -13,11 +11,8 @@ static const char fileIdent[] = "$Id$";
  */
 
 /* sets up a new keybinding for a command */
-int owl_keybinding_init(owl_keybinding *kb, char *keyseq, char *command, void (*function_fn)(void), char *desc)
+int owl_keybinding_init(owl_keybinding *kb, const char *keyseq, const char *command, void (*function_fn)(void), const char *desc)
 {
-  char **ktokens;
-  int    nktokens, i;
-  
   owl_function_debugmsg("owl_keybinding_init: creating binding for <%s> with desc: <%s>", keyseq, desc);
   if (command && !function_fn) {
     kb->type = OWL_KEYBINDING_COMMAND;
@@ -27,24 +22,9 @@ int owl_keybinding_init(owl_keybinding *kb, char *keyseq, char *command, void (*
     return(-1);
   }
 
-  ktokens = atokenize(keyseq, " ", &nktokens);
-  if (!ktokens) return(-1);
-  if (nktokens > OWL_KEYMAP_MAXSTACK) {
-    atokenize_free(ktokens, nktokens);
+  if (owl_keybinding_make_keys(kb, keyseq) != 0) {
     return(-1);
   }
-  kb->keys = owl_malloc(nktokens*sizeof(int));
-  for (i=0; i<nktokens; i++) {
-    kb->keys[i] = owl_keypress_fromstring(ktokens[i]);
-    if (kb->keys[i] == ERR) { 
-      atokenize_free(ktokens, nktokens);
-      owl_free(kb->keys);
-      return(-1);
-    }
-  }
-  kb->len = nktokens;
-
-  atokenize_free(ktokens, nktokens);
 
   if (command) kb->command = owl_strdup(command);
   kb->function_fn = function_fn;
@@ -53,8 +33,33 @@ int owl_keybinding_init(owl_keybinding *kb, char *keyseq, char *command, void (*
   return(0);
 }
 
+int owl_keybinding_make_keys(owl_keybinding *kb, const char *keyseq)
+{
+  char **ktokens;
+  int    nktokens, i;
+
+  ktokens = atokenize(keyseq, " ", &nktokens);
+  if (!ktokens) return(-1);
+  if (nktokens > OWL_KEYMAP_MAXSTACK) {
+    atokenize_delete(ktokens, nktokens);
+    return(-1);
+  }
+  kb->keys = owl_malloc(nktokens*sizeof(int));
+  for (i=0; i<nktokens; i++) {
+    kb->keys[i] = owl_keypress_fromstring(ktokens[i]);
+    if (kb->keys[i] == ERR) { 
+      atokenize_delete(ktokens, nktokens);
+      owl_free(kb->keys);
+      return(-1);
+    }
+  }
+  kb->len = nktokens;
+  atokenize_delete(ktokens, nktokens);
+  return(0);
+}
+
 /* Releases data associated with a keybinding */
-void owl_keybinding_free(owl_keybinding *kb)
+void owl_keybinding_cleanup(owl_keybinding *kb)
 {
   if (kb->keys) owl_free(kb->keys);
   if (kb->desc) owl_free(kb->desc);
@@ -62,14 +67,14 @@ void owl_keybinding_free(owl_keybinding *kb)
 }
 
 /* Releases data associated with a keybinding, and the kb itself */
-void owl_keybinding_free_all(owl_keybinding *kb)
+void owl_keybinding_delete(owl_keybinding *kb)
 {
-  owl_keybinding_free(kb);
+  owl_keybinding_cleanup(kb);
   owl_free(kb);
 }
 
 /* executes a keybinding */
-void owl_keybinding_execute(owl_keybinding *kb, int j)
+void owl_keybinding_execute(const owl_keybinding *kb, int j)
 {
   if (kb->type == OWL_KEYBINDING_COMMAND && kb->command) {
     owl_function_command_norv(kb->command);
@@ -96,18 +101,18 @@ int owl_keybinding_stack_tostring(int *j, int len, char *buff, int bufflen)
 }
 
 /* returns 0 on success */
-int owl_keybinding_tostring(owl_keybinding *kb, char *buff, int bufflen)
+int owl_keybinding_tostring(const owl_keybinding *kb, char *buff, int bufflen)
 {
   return owl_keybinding_stack_tostring(kb->keys, kb->len, buff, bufflen);
 }
 
-char *owl_keybinding_get_desc(owl_keybinding *kb)
+const char *owl_keybinding_get_desc(const owl_keybinding *kb)
 {
   return kb->desc;
 }
 
 /* returns 0 on no match, 1 on subset match, and 2 on complete match */
-int owl_keybinding_match(owl_keybinding *kb, owl_keyhandler *kh)
+int owl_keybinding_match(const owl_keybinding *kb, const owl_keyhandler *kh)
 {
   int i;
   for(i = 0; i <= kh->kpstackpos && i < kb->len; i++) {
@@ -127,7 +132,7 @@ int owl_keybinding_match(owl_keybinding *kb, owl_keyhandler *kh)
 }
 
 /* returns 1 if keypress sequence is the same */
-int owl_keybinding_equal(owl_keybinding *kb1, owl_keybinding *kb2)
+int owl_keybinding_equal(const owl_keybinding *kb1, const owl_keybinding *kb2)
 {
   int i;
 

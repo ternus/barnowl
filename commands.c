@@ -1,47 +1,46 @@
+#include <getopt.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include "owl.h"
 
-static const char fileIdent[] = "$Id$";
-
-/* fn is "char *foo(int argc, char **argv, char *buff)" */
+/* fn is "char *foo(int argc, const char *const *argv, const char *buff)" */
 #define OWLCMD_ARGS(name, fn, ctx, summary, usage, description) \
         { name, summary, usage, description, ctx, \
-          NULL, fn, NULL, NULL, NULL, NULL, NULL }
+          NULL, fn, NULL, NULL, NULL, NULL, NULL, NULL }
 
 /* fn is "void foo(void)" */
 #define OWLCMD_VOID(name, fn, ctx, summary, usage, description) \
         { name, summary, usage, description, ctx, \
-          NULL, NULL, fn, NULL, NULL, NULL, NULL }
+          NULL, NULL, fn, NULL, NULL, NULL, NULL, NULL }
 
 /* fn is "void foo(int)" */
 #define OWLCMD_INT(name, fn, ctx, summary, usage, description) \
         { name, summary, usage, description, ctx, \
-          NULL, NULL, NULL, fn, NULL, NULL, NULL }
+          NULL, NULL, NULL, fn, NULL, NULL, NULL, NULL }
 
 #define OWLCMD_ALIAS(name, actualname) \
         { name, OWL_CMD_ALIAS_SUMMARY_PREFIX actualname, "", "", OWL_CTX_ANY, \
-          actualname, NULL, NULL, NULL, NULL, NULL, NULL }
+          actualname, NULL, NULL, NULL, NULL, NULL, NULL, NULL }
 
-/* fn is "char *foo(void *ctx, int argc, char **argv, char *buff)" */
+/* fn is "char *foo(void *ctx, int argc, const char *const *argv, const char *buff)" */
 #define OWLCMD_ARGS_CTX(name, fn, ctx, summary, usage, description) \
         { name, summary, usage, description, ctx, \
-          NULL, NULL, NULL, NULL, ((char*(*)(void*,int,char**,char*))fn), NULL, NULL }
+          NULL, NULL, NULL, NULL, ((char*(*)(void*,int,const char*const *,const char*))fn), NULL, NULL, NULL }
 
 /* fn is "void foo(void)" */
 #define OWLCMD_VOID_CTX(name, fn, ctx, summary, usage, description) \
         { name, summary, usage, description, ctx, \
-          NULL, NULL, NULL, NULL, NULL, ((void(*)(void*))(fn)), NULL }
+          NULL, NULL, NULL, NULL, NULL, ((void(*)(void*))(fn)), NULL, NULL }
 
 /* fn is "void foo(int)" */
 #define OWLCMD_INT_CTX(name, fn, ctx, summary, usage, description) \
         { name, summary, usage, description, ctx, \
-          NULL, NULL, NULL, NULL, NULL, NULL, ((void(*)(void*,int))fn) }
+          NULL, NULL, NULL, NULL, NULL, NULL, ((void(*)(void*,int))fn), NULL }
 
 
-owl_cmd commands_to_init[]
+const owl_cmd commands_to_init[]
   = {
   OWLCMD_ARGS("zlog", owl_command_zlog, OWL_CTX_ANY,
 	      "send a login or logout notification",
@@ -77,16 +76,6 @@ owl_cmd commands_to_init[]
 	      "start-command [initial-value]",
 	      "Initializes the command field to initial-value."),
 
-  OWLCMD_ARGS("start-question", owl_command_start_question, OWL_CTX_INTERACTIVE,
-	      "prompts the user to enter a response to some question",
-	      "start-command <question>",
-	      ""),
-
-  OWLCMD_ARGS("start-password", owl_command_start_password, OWL_CTX_INTERACTIVE,
-	      "prompts the user to enter a password",
-	      "start-password <question>",
-	      ""),
-
   OWLCMD_ARGS("alias", owl_command_alias, OWL_CTX_ANY,
 	      "creates a command alias",
 	      "alias <new_command> <old_command>",
@@ -97,9 +86,21 @@ owl_cmd commands_to_init[]
   OWLCMD_ARGS("bindkey", owl_command_bindkey, OWL_CTX_ANY,
 	      "creates a binding in a keymap",
 	      "bindkey <keymap> <keyseq> command <command>",
+	      "(Note: There is a literal word \"command\" between <keyseq>\n"
+	      " and <command>.)\n"
 	      "Binds a key sequence to a command within a keymap.\n"
 	      "Use 'show keymaps' to see the existing keymaps.\n"
-	      "Key sequences may be things like M-C-t or NPAGE.\n"),
+	      "Key sequences may be things like M-C-t or NPAGE.\n\n"
+	      "Ex.: bindkey recv C-b command zwrite -c barnowl"
+              "SEE ALSO: bindkey"),
+
+  OWLCMD_ARGS("unbindkey", owl_command_unbindkey, OWL_CTX_ANY,
+	      "removes a binding in a keymap",
+	      "bindkey <keymap> <keyseq>",
+	      "Removes a binding of a key sequence within a keymap.\n"
+	      "Use 'show keymaps' to see the existing keymaps.\n"
+	      "Ex.: unbindkey recv H"
+              "SEE ALSO: bindkey"),
 
   OWLCMD_ARGS("zwrite", owl_command_zwrite, OWL_CTX_INTERACTIVE,
 	      "send a zephyr",
@@ -162,8 +163,8 @@ owl_cmd commands_to_init[]
 
   OWLCMD_ARGS("unset", owl_command_unset, OWL_CTX_ANY,
 	      "unset a boolean variable value",
-	      "set [-q] <variable>\n"
-	      "set",
+	      "unset [-q] <variable>\n"
+	      "unset",
 	      "Set the named boolean variable to off.\n"
 	      "If -q is specified, is silent and doesn't print a message.\n"),
 
@@ -308,26 +309,26 @@ owl_cmd commands_to_init[]
 	      "znol [-f file]",
 	      "Print a znol-style listing of users logged in"),
 
-  OWLCMD_ARGS("alist", owl_command_alist, OWL_CTX_INTERACTIVE,
+  OWLCMD_VOID("alist", owl_command_alist, OWL_CTX_INTERACTIVE,
 	      "List AIM users logged in",
 	      "alist",
 	      "Print a listing of AIM users logged in"),
 
-  OWLCMD_ARGS("blist", owl_command_blist, OWL_CTX_INTERACTIVE,
+  OWLCMD_VOID("blist", owl_command_blist, OWL_CTX_INTERACTIVE,
 	      "List all buddies logged in",
 	      "blist",
 	      "Print a listing of buddies logged in, regardless of protocol."),
 
-  OWLCMD_ARGS("toggle-oneline", owl_command_toggleoneline, OWL_CTX_INTERACTIVE,
+  OWLCMD_VOID("toggle-oneline", owl_command_toggleoneline, OWL_CTX_INTERACTIVE,
 	      "Toggle the style between oneline and the default style",
 	      "toggle-oneline",
 	      ""),
 
-  OWLCMD_VOID("recv:shiftleft", owl_command_shift_left, OWL_CTX_INTERACTIVE,
-	      "scrolls receive window to the left", "", ""),
+  OWLCMD_ARGS("recv:getshift", owl_command_get_shift, OWL_CTX_INTERACTIVE,
+	      "gets position of receive window scrolling", "", ""),
 
-  OWLCMD_VOID("recv:shiftright", owl_command_shift_right, OWL_CTX_INTERACTIVE,
-	      "scrolls receive window to the left", "", ""),
+  OWLCMD_INT("recv:setshift", owl_command_set_shift, OWL_CTX_INTERACTIVE,
+	      "scrolls receive window to specified position", "", ""),
 
   OWLCMD_VOID("recv:pagedown", owl_function_mainwin_pagedown, 
 	      OWL_CTX_INTERACTIVE,
@@ -591,7 +592,7 @@ owl_cmd commands_to_init[]
 
   OWLCMD_ARGS("smartnarrow", owl_command_smartnarrow, OWL_CTX_INTERACTIVE,
 	      "view only messages similar to the current message",
-	      "smartnarrow [-i | --instance]",
+	      "smartnarrow [-i | --instance]  [-r | --relatde]",
 	      "If the curmsg is a personal message narrow\n"
 	      "   to the conversation with that user.\n"
 	      "If the curmsg is a <MESSAGE, foo, *>\n"
@@ -599,7 +600,9 @@ owl_cmd commands_to_init[]
 	      "If the curmsg is a class message, narrow\n"
 	      "    to the class.\n"
 	      "If the curmsg is a class message and '-i' is specified\n"
-	      "    then narrow to the class and instance.\n"),
+	      "    then narrow to the class and instance.\n"
+	      "If '-r' or '--related' is specified, behave as though the\n"
+              "    'narrow-related' variable was inverted."),
 
   OWLCMD_ARGS("smartfilter", owl_command_smartfilter, OWL_CTX_INTERACTIVE,
 	      "returns the name of a filter based on the current message",
@@ -862,7 +865,7 @@ owl_cmd commands_to_init[]
 
   OWLCMD_VOID_CTX("edit:history-next", owl_command_edit_history_next, 
 		  OWL_CTX_EDIT,
-		  "replaces the text with the previous history",
+		  "replaces the text with the next history",
 		  "", ""),
 
   OWLCMD_VOID_CTX("edit:history-prev", owl_command_edit_history_prev, 
@@ -870,38 +873,68 @@ owl_cmd commands_to_init[]
 		  "replaces the text with the previous history",
 		  "", ""),
 
-  OWLCMD_VOID_CTX("editline:done", owl_command_editline_done, 
-		  OWL_CTX_EDITLINE,
-		  "completes the command (eg, executes command being composed)",
+  OWLCMD_VOID_CTX("edit:set-mark", owl_editwin_set_mark,
+		  OWL_CTX_EDIT,
+		  "sets the mark",
 		  "", ""),
 
-  OWLCMD_VOID_CTX("editresponse:done", owl_command_editresponse_done, 
-		  OWL_CTX_EDITRESPONSE,
-		  "completes the response to a question",
+  OWLCMD_VOID_CTX("edit:exchange-point-and-mark", owl_editwin_exchange_point_and_mark,
+		  OWL_CTX_EDIT,
+		  "exchanges the point and the mark",
 		  "", ""),
 
-  OWLCMD_VOID_CTX("editmulti:move-up-line", owl_editwin_key_up, 
+  OWLCMD_VOID_CTX("edit:copy-region-as-kill", owl_editwin_copy_region_as_kill,
+		  OWL_CTX_EDIT,
+		  "copy the text between the point and the mark",
+		  "", ""),
+
+  OWLCMD_VOID_CTX("edit:kill-region", owl_editwin_kill_region,
+		  OWL_CTX_EDIT,
+		  "kill text between the point and the mark",
+		  "", ""),
+
+  OWLCMD_VOID_CTX("edit:yank", owl_editwin_yank,
+		  OWL_CTX_EDIT,
+		  "insert the current text from the kill buffer",
+		  "", ""),
+
+  OWLCMD_ALIAS   ("editline:done", "edit:done"),
+  OWLCMD_ALIAS   ("editresponse:done", "edit:done"),
+
+  OWLCMD_VOID_CTX("edit:move-up-line", owl_editwin_key_up, 
 		  OWL_CTX_EDITMULTI,
 		  "moves the cursor up one line",
 		  "", ""),
 
-  OWLCMD_VOID_CTX("editmulti:move-down-line", owl_editwin_key_down, 
+  OWLCMD_VOID_CTX("edit:move-down-line", owl_editwin_key_down, 
 		  OWL_CTX_EDITMULTI,
 		  "moves the cursor down one line",
 		  "", ""),
 
-  OWLCMD_VOID_CTX("editmulti:done", owl_command_editmulti_done, 
-		  OWL_CTX_EDITMULTI,
-		  "completes the command (eg, sends message being composed)",
+  OWLCMD_VOID_CTX("edit:done", owl_command_edit_done, 
+		  OWL_CTX_EDIT,
+		  "Finishes entering text in the editwin.",
 		  "", ""),
 
-  OWLCMD_VOID_CTX("editmulti:done-or-delete", owl_command_editmulti_done_or_delete, 
+  OWLCMD_VOID_CTX("edit:done-or-delete", owl_command_edit_done_or_delete, 
 		  OWL_CTX_EDITMULTI,
 		  "completes the command, but only if at end of message",
 		  "", 
 		  "If only whitespace is to the right of the cursor,\n"
-		  "runs 'editmulti:done'.\n"\
+		  "runs 'edit:done'.\n"\
 		  "Otherwise runs 'edit:delete-next-char'\n"),
+
+  OWLCMD_VOID_CTX("edit:forward-paragraph", owl_editwin_forward_paragraph,
+                  OWL_CTX_EDITMULTI,
+                  "Move forward to end of paragraph.",
+                  "",
+                  "Move the point to the end of the current paragraph"),
+
+  OWLCMD_VOID_CTX("edit:backward-paragraph", owl_editwin_backward_paragraph,
+                  OWL_CTX_EDITMULTI,
+                  "Move backward to the start of paragraph.",
+                  "",
+                  "Move the point to the start of the current paragraph"),
 
   /****************************************************************/
   /********************** POPLESS-SPECIFIC ************************/
@@ -955,20 +988,20 @@ owl_cmd commands_to_init[]
   OWLCMD_ALIAS("webzephyr", "zwrite daemon.webzephyr -c webzephyr -i"),
 
   /* This line MUST be last! */
-  { NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL }
+  { NULL, NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL }
 
 };
 
-void owl_command_info()
+void owl_command_info(void)
 {
   owl_function_info();
 }
 
-void owl_command_nop()
+void owl_command_nop(void)
 {
 }
 
-char *owl_command_help(int argc, char **argv, char *buff)
+char *owl_command_help(int argc, const char *const *argv, const char *buff)
 {
   if (argc!=2) {
     owl_help();
@@ -979,23 +1012,14 @@ char *owl_command_help(int argc, char **argv, char *buff)
   return NULL;
 }
 
-char *owl_command_zlist(int argc, char **argv, char *buff)
+char *owl_command_zlist(int argc, const char *const *argv, const char *buff)
 {
-  int elapsed=0, timesort=0;
-  char *file=NULL;
+  const char *file=NULL;
 
   argc--;
   argv++;
   while (argc) {
-    if (!strcmp(argv[0], "-e")) {
-      elapsed=1;
-      argc--;
-      argv++;
-    } else if (!strcmp(argv[0], "-t")) {
-      timesort=1;
-      argc--;
-      argv++;
-    } else if (!strcmp(argv[0], "-f")) {
+    if (!strcmp(argv[0], "-f")) {
       if (argc==1) {
 	owl_function_makemsg("zlist: -f needs an argument");
 	return(NULL);
@@ -1012,35 +1036,32 @@ char *owl_command_zlist(int argc, char **argv, char *buff)
   return(NULL);
 }
 
-char *owl_command_alist()
+void owl_command_alist(void)
 {
   owl_function_buddylist(1, 0, NULL);
-  return(NULL);
 }
 
-char *owl_command_blist()
+void owl_command_blist(void)
 {
   owl_function_buddylist(1, 1, NULL);
-  return(NULL);
 }
 
-char *owl_command_toggleoneline()
+void owl_command_toggleoneline(void)
 {
   owl_function_toggleoneline();
-  return(NULL);
 }
 
-void owl_command_about()
+void owl_command_about(void)
 {
   owl_function_about();
 }
 
-void owl_command_version()
+void owl_command_version(void)
 {
   owl_function_makemsg("BarnOwl version %s", OWL_VERSION_STRING);
 }
 
-char *owl_command_aim(int argc, char **argv, char *buff)
+char *owl_command_aim(int argc, const char *const *argv, const char *buff)
 {
   if (argc<2) {
     owl_function_makemsg("not enough arguments to aim command");
@@ -1060,7 +1081,7 @@ char *owl_command_aim(int argc, char **argv, char *buff)
   return(NULL);
 }
 
-char *owl_command_addbuddy(int argc, char **argv, char *buff)
+char *owl_command_addbuddy(int argc, const char *const *argv, const char *buff)
 {
   if (argc!=3) {
     owl_function_makemsg("usage: addbuddy <protocol> <buddyname>");
@@ -1088,7 +1109,7 @@ char *owl_command_addbuddy(int argc, char **argv, char *buff)
   return(NULL);
 }
 
-char *owl_command_delbuddy(int argc, char **argv, char *buff)
+char *owl_command_delbuddy(int argc, const char *const *argv, const char *buff)
 {
   if (argc!=3) {
     owl_function_makemsg("usage: delbuddy <protocol> <buddyname>");
@@ -1112,7 +1133,7 @@ char *owl_command_delbuddy(int argc, char **argv, char *buff)
   return(NULL);
 }
 
-char *owl_command_join(int argc, char **argv, char *buff)
+char *owl_command_join(int argc, const char *const *argv, const char *buff)
 {
   if (argc!=3 && argc!=4) {
     owl_function_makemsg("usage: join <protocol> <buddyname> [exchange]");
@@ -1136,48 +1157,40 @@ char *owl_command_join(int argc, char **argv, char *buff)
   return(NULL);
 }
 
-char *owl_command_startup(int argc, char **argv, char *buff)
+char *owl_command_startup(int argc, const char *const *argv, const char *buff)
 {
-  char *ptr;
+  const char *ptr;
 
   if (argc<2) {
     owl_function_makemsg("usage: %s <commands> ...", argv[0]);
     return(NULL);
   }
 
-  ptr=strchr(buff, ' ');
-  if (!ptr) {
-    owl_function_makemsg("Parse error finding command for startup");
-    return(NULL);
-  }
+  ptr = skiptokens(buff, 1);
 
-  owl_function_command(ptr+1);
-  owl_function_addstartup(ptr+1);
+  owl_function_command(ptr);
+  owl_function_addstartup(ptr);
 
   return(NULL);
 }
 
-char *owl_command_unstartup(int argc, char **argv, char *buff)
+char *owl_command_unstartup(int argc, const char *const *argv, const char *buff)
 {
-  char *ptr;
+  const char *ptr;
 
   if (argc<2) {
     owl_function_makemsg("usage: %s <commands> ...", argv[0]);
     return(NULL);
   }
 
-  ptr=strchr(buff, ' ');
-  if (!ptr) {
-    owl_function_makemsg("Parse error finding command for unstartup");
-    return(NULL);
-  }
+  ptr = skiptokens(buff, 1);
 
-  owl_function_delstartup(ptr+1);
+  owl_function_delstartup(ptr);
 
   return(NULL);
 }
 
-char *owl_command_dump(int argc, char **argv, char *buff)
+char *owl_command_dump(int argc, const char *const *argv, const char *buff)
 {
   char *filename;
   
@@ -1191,7 +1204,7 @@ char *owl_command_dump(int argc, char **argv, char *buff)
   return(NULL);
 }
 
-char *owl_command_source(int argc, char **argv, char *buff)
+char *owl_command_source(int argc, const char *const *argv, const char *buff)
 {
   if (argc!=2) {
     owl_function_makemsg("usage: source <filename>");
@@ -1202,7 +1215,7 @@ char *owl_command_source(int argc, char **argv, char *buff)
   return(NULL);
 }
 
-char *owl_command_next(int argc, char **argv, char *buff)
+char *owl_command_next(int argc, const char *const *argv, const char *buff)
 {
   char *filter=NULL;
   int skip_deleted=0, last_if_none=0;
@@ -1217,10 +1230,10 @@ char *owl_command_next(int argc, char **argv, char *buff)
       filter = owl_strdup(argv[2]);
       argc-=2; argv+=2; 
     } else if (argc>=2 && !strcmp(argv[1], "--smart-filter")) {
-      filter = owl_function_smartfilter(0);
+      filter = owl_function_smartfilter(0, 0);
       argc-=2; argv+=2; 
     } else if (argc>=2 && !strcmp(argv[1], "--smart-filter-instance")) {
-      filter = owl_function_smartfilter(1);
+      filter = owl_function_smartfilter(1, 0);
       argc-=2; argv+=2; 
     } else {
       owl_function_makemsg("Invalid arguments to command 'next'.");
@@ -1232,7 +1245,7 @@ char *owl_command_next(int argc, char **argv, char *buff)
   return(NULL);
 }
 
-char *owl_command_prev(int argc, char **argv, char *buff)
+char *owl_command_prev(int argc, const char *const *argv, const char *buff)
 {
   char *filter=NULL;
   int skip_deleted=0, first_if_none=0;
@@ -1247,10 +1260,10 @@ char *owl_command_prev(int argc, char **argv, char *buff)
       filter = owl_strdup(argv[2]);
       argc-=2; argv+=2; 
     } else if (argc>=2 && !strcmp(argv[1], "--smart-filter")) {
-      filter = owl_function_smartfilter(0);
+      filter = owl_function_smartfilter(0, 0);
       argc-=2; argv+=2; 
     } else if (argc>=2 && !strcmp(argv[1], "--smart-filter-instance")) {
-      filter = owl_function_smartfilter(1);
+      filter = owl_function_smartfilter(1, 0);
       argc-=2; argv+=2;  
    } else {
       owl_function_makemsg("Invalid arguments to command 'prev'.");
@@ -1262,81 +1275,115 @@ char *owl_command_prev(int argc, char **argv, char *buff)
   return(NULL);
 }
 
-char *owl_command_smartnarrow(int argc, char **argv, char *buff)
+char *owl_command_smartnarrow(int argc, const char *const *argv, const char *buff)
 {
   char *filtname = NULL;
 
-  if (argc == 1) {
-    filtname = owl_function_smartfilter(0);
-  } else if (argc == 2 && (!strcmp(argv[1], "-i") || !strcmp(argv[1], "--instance"))) {
-    filtname = owl_function_smartfilter(1);
-  } else {
-    owl_function_makemsg("Wrong number of arguments for %s", argv[0]);    
+  char opt;
+  int instance = 0, related = 0, i;
+  char **tmp_argv = owl_malloc(sizeof(char *) * argc);
+
+  for (i = 0; i < argc; i++)
+    tmp_argv[i] = owl_strdup(argv[i]);
+
+  static struct option options[] = {
+    {"instance", 0, 0, 'i'},
+    {"related",  0, 0, 'r'},
+    {NULL,       0, 0, 0}};
+  while ((opt = getopt_long(argc, tmp_argv, "ir", options, NULL)) != -1) {
+    switch (opt) {
+      case 'i':
+        instance = 1;
+        break;
+      case 'r':
+        related = 1;
+        break;
+      default:
+        owl_function_makemsg("Wrong number of arguments for %s (%c)", argv[0], opt);
+        goto done;
+    }
   }
+
+  for (i = 0; i < argc; i++)
+    owl_free(tmp_argv[i]);
+  owl_free(tmp_argv);
+
+  filtname = owl_function_smartfilter(instance, related);
+
   if (filtname) {
     owl_function_change_currentview_filter(filtname);
     owl_free(filtname);
   }
+
+done:
+  optind = 0; /* reset getopt */
   return NULL;
 }
 
-char *owl_command_smartfilter(int argc, char **argv, char *buff)
+char *owl_command_smartfilter(int argc, const char *const *argv, const char *buff)
 {
   char *filtname = NULL;
 
   if (argc == 1) {
-    filtname = owl_function_smartfilter(0);
+    filtname = owl_function_smartfilter(0, 0);
   } else if (argc == 2 && (!strcmp(argv[1], "-i") || !strcmp(argv[1], "--instance"))) {
-    filtname = owl_function_smartfilter(1);
+    filtname = owl_function_smartfilter(1, 0);
   } else {
     owl_function_makemsg("Wrong number of arguments for %s", argv[0]);    
   }
   return filtname;
 }
 
-void owl_command_expunge()
+void owl_command_expunge(void)
 {
   owl_function_expunge();
 }
 
-void owl_command_first()
+void owl_command_first(void)
 {
   owl_global_set_rightshift(&g, 0);
   owl_function_firstmsg();
 }
 
-void owl_command_last()
+void owl_command_last(void)
 {
   owl_function_lastmsg();
 }
 
-void owl_command_resize()
+void owl_command_resize(void)
 {
   owl_function_resize();
 }
 
-void owl_command_redisplay()
+void owl_command_redisplay(void)
 {
   owl_function_full_redisplay();
   owl_global_set_needrefresh(&g);
 }
 
-void owl_command_shift_right()
+char *owl_command_get_shift(int argc, const char *const *argv, const char *buff)
 {
-  owl_function_shift_right();
+  if(argc != 1)
+  {
+    owl_function_makemsg("Wrong number of arguments for %s", argv[0]);
+    return NULL;
+  }
+  return owl_sprintf("%d", owl_global_get_rightshift(&g));
 }
 
-void owl_command_shift_left()
+void owl_command_set_shift(int shift)
 {
-  owl_function_shift_left();
+  owl_global_set_rightshift(&g, shift);
+  owl_mainwin_redisplay(owl_global_get_mainwin(&g));
+  owl_global_set_needrefresh(&g);
 }
 
-void owl_command_unsuball()
+void owl_command_unsuball(void)
 {
   owl_function_unsuball();
 }
 
-char *owl_command_loadsubs(int argc, char **argv, char *buff)
+char *owl_command_loadsubs(int argc, const char *const *argv, const char *buff)
 {
   if (argc == 2) {
     owl_function_loadsubs(argv[1]);
@@ -1350,7 +1397,7 @@ char *owl_command_loadsubs(int argc, char **argv, char *buff)
 }
 
 
-char *owl_command_loadloginsubs(int argc, char **argv, char *buff)
+char *owl_command_loadloginsubs(int argc, const char *const *argv, const char *buff)
 {
   if (argc == 2) {
     owl_function_loadloginsubs(argv[1]);
@@ -1363,33 +1410,19 @@ char *owl_command_loadloginsubs(int argc, char **argv, char *buff)
   return(NULL);
 }
 
-void owl_command_suspend()
+void owl_command_suspend(void)
 {
   owl_function_suspend();
 }
 
-char *owl_command_start_command(int argc, char **argv, char *buff)
+char *owl_command_start_command(int argc, const char *const *argv, const char *buff)
 {
   buff = skiptokens(buff, 1);
   owl_function_start_command(buff);
   return(NULL);
 }
 
-char *owl_command_start_question(int argc, char **argv, char *buff)
-{
-  buff = skiptokens(buff, 1);
-  owl_function_start_question(buff);
-  return(NULL);
-}
-
-char *owl_command_start_password(int argc, char **argv, char *buff)
-{
-  buff = skiptokens(buff, 1);
-  owl_function_start_password(buff);
-  return(NULL);
-}
-
-char *owl_command_zaway(int argc, char **argv, char *buff)
+char *owl_command_zaway(int argc, const char *const *argv, const char *buff)
 {
   if ((argc==1) ||
       ((argc==2) && !strcmp(argv[1], "on"))) {
@@ -1415,7 +1448,7 @@ char *owl_command_zaway(int argc, char **argv, char *buff)
 }
 
 
-char *owl_command_aaway(int argc, char **argv, char *buff)
+char *owl_command_aaway(int argc, const char *const *argv, const char *buff)
 {
   if ((argc==1) ||
       ((argc==2) && !strcmp(argv[1], "on"))) {
@@ -1441,7 +1474,7 @@ char *owl_command_aaway(int argc, char **argv, char *buff)
 }
 
 
-char *owl_command_away(int argc, char **argv, char *buff)
+char *owl_command_away(int argc, const char *const *argv, const char *buff)
 {
   if ((argc==1) ||
       ((argc==2) && !strcmp(argv[1], "on"))) {
@@ -1484,9 +1517,9 @@ char *owl_command_away(int argc, char **argv, char *buff)
   return NULL;
 }
 
-char *owl_command_set(int argc, char **argv, char *buff)
+char *owl_command_set(int argc, const char *const *argv, const char *buff)
 {
-  char *var, *val;
+  const char *var, *val;
   int  silent=0;
   int requirebool=0;
 
@@ -1515,9 +1548,9 @@ char *owl_command_set(int argc, char **argv, char *buff)
   return NULL;
 }
 
-char *owl_command_unset(int argc, char **argv, char *buff)
+char *owl_command_unset(int argc, const char *const *argv, const char *buff)
 {
-  char *var, *val;
+  const char *var, *val;
   int  silent=0;
 
   if (argc > 1 && !strcmp("-q",argv[1])) {
@@ -1535,9 +1568,9 @@ char *owl_command_unset(int argc, char **argv, char *buff)
   return NULL;
 }
 
-char *owl_command_print(int argc, char **argv, char *buff)
+char *owl_command_print(int argc, const char *const *argv, const char *buff)
 {
-  char *var;
+  const char *var;
   char valbuff[1024];
 
   if (argc==1) {
@@ -1560,47 +1593,46 @@ char *owl_command_print(int argc, char **argv, char *buff)
 }
 
 
-char *owl_command_exec(int argc, char **argv, char *buff)
+char *owl_command_exec(int argc, const char *const *argv, const char *buff)
 {
   return owl_function_exec(argc, argv, buff, 0);
 }
 
-char *owl_command_pexec(int argc, char **argv, char *buff)
+char *owl_command_pexec(int argc, const char *const *argv, const char *buff)
 {
   return owl_function_exec(argc, argv, buff, 1);
 }
 
-char *owl_command_aexec(int argc, char **argv, char *buff)
+char *owl_command_aexec(int argc, const char *const *argv, const char *buff)
 {
   return owl_function_exec(argc, argv, buff, 2);
 }
 
-char *owl_command_perl(int argc, char **argv, char *buff)
+char *owl_command_perl(int argc, const char *const *argv, const char *buff)
 {
   return owl_function_perl(argc, argv, buff, 0);
 }
 
-char *owl_command_pperl(int argc, char **argv, char *buff)
+char *owl_command_pperl(int argc, const char *const *argv, const char *buff)
 {
   return owl_function_perl(argc, argv, buff, 1);
 }
 
-char *owl_command_aperl(int argc, char **argv, char *buff)
+char *owl_command_aperl(int argc, const char *const *argv, const char *buff)
 {
   return owl_function_perl(argc, argv, buff, 2);
 }
 
-char *owl_command_multi(int argc, char **argv, char *buff)
+char *owl_command_multi(int argc, const char *const *argv, const char *buff)
 {
-  char *lastrv = NULL, *dupbuff, *newbuff;
+  char *lastrv = NULL, *newbuff;
   char **commands;
   int  ncommands, i;
   if (argc < 2) {
     owl_function_makemsg("Invalid arguments to 'multi' command.");    
     return NULL;
   }
-  dupbuff = owl_strdup(buff);
-  newbuff = skiptokens(dupbuff, 1);
+  newbuff = owl_strdup(skiptokens(buff, 1));
   if (!strcmp(argv[0], "(")) {
     for (i=strlen(newbuff)-1; i>=0; i--) {
       if (newbuff[i] == ')') {
@@ -1620,13 +1652,13 @@ char *owl_command_multi(int argc, char **argv, char *buff)
     }
     lastrv = owl_function_command(commands[i]);
   }
-  owl_free(dupbuff);
-  atokenize_free(commands, ncommands);
+  owl_free(newbuff);
+  atokenize_delete(commands, ncommands);
   return lastrv;
 }
 
 
-char *owl_command_alias(int argc, char **argv, char *buff)
+char *owl_command_alias(int argc, const char *const *argv, const char *buff)
 {
   if (argc < 3) {
     owl_function_makemsg("Invalid arguments to 'alias' command.");
@@ -1638,7 +1670,7 @@ char *owl_command_alias(int argc, char **argv, char *buff)
 }
 
 
-char *owl_command_bindkey(int argc, char **argv, char *buff)
+char *owl_command_bindkey(int argc, const char *const *argv, const char *buff)
 {
   owl_keymap *km;
   int ret;
@@ -1662,12 +1694,40 @@ char *owl_command_bindkey(int argc, char **argv, char *buff)
   return NULL;
 }
 
-void owl_command_quit()
+
+char *owl_command_unbindkey(int argc, const char *const *argv, const char *buf)
+{
+  owl_keymap *km;
+  int ret;
+
+  if (argc < 3) {
+    owl_function_makemsg("Usage: bindkey <keymap> <binding>");
+    return NULL;
+  }
+  km = owl_keyhandler_get_keymap(owl_global_get_keyhandler(&g), argv[1]);
+  if (!km) {
+    owl_function_makemsg("No such keymap '%s'", argv[1]);
+    return NULL;
+  }
+  ret = owl_keymap_remove_binding(km, argv[2]);
+  if (ret == -1) {
+    owl_function_makemsg("Unable to unbind '%s' in keymap '%s'.",
+			 argv[2], argv[1]);
+    return NULL;
+  } else if (ret == -2) {
+    owl_function_makemsg("No such binding '%s' in keymap '%s'.",
+                         argv[2], argv[1]);
+  }
+  return NULL;
+}
+
+
+void owl_command_quit(void)
 {
   owl_function_quit();
 }
 
-char *owl_command_debug(int argc, char **argv, char *buff)
+char *owl_command_debug(int argc, const char *const *argv, const char *buff)
 {
   if (argc<2) {
     owl_function_makemsg("Need at least one argument to debug command");
@@ -1683,7 +1743,7 @@ char *owl_command_debug(int argc, char **argv, char *buff)
   return(NULL);
 }
 
-char *owl_command_term(int argc, char **argv, char *buff)
+char *owl_command_term(int argc, const char *const *argv, const char *buff)
 {
   if (argc<2) {
     owl_function_makemsg("Need at least one argument to the term command");
@@ -1700,7 +1760,7 @@ char *owl_command_term(int argc, char **argv, char *buff)
   return(NULL);
 }
 
-char *owl_command_zlog(int argc, char **argv, char *buff)
+char *owl_command_zlog(int argc, const char *const *argv, const char *buff)
 {
   if ((argc<2) || (argc>3)) {
     owl_function_makemsg("Wrong number of arguments for zlog command");
@@ -1724,9 +1784,9 @@ char *owl_command_zlog(int argc, char **argv, char *buff)
   return(NULL);
 }
 
-char *owl_command_subscribe(int argc, char **argv, char *buff)
+char *owl_command_subscribe(int argc, const char *const *argv, const char *buff)
 {
-  char *class, *instance, *recip="";
+  const char *class, *instance, *recip="";
   int temp=0;
   int ret=0;
 
@@ -1774,9 +1834,9 @@ char *owl_command_subscribe(int argc, char **argv, char *buff)
 }
 
 
-char *owl_command_unsubscribe(int argc, char **argv, char *buff)
+char *owl_command_unsubscribe(int argc, const char *const *argv, const char *buff)
 {
-  char *class, *instance, *recip="";
+  const char *class, *instance, *recip="";
   int temp=0;
 
   if (argc < 2) {
@@ -1822,7 +1882,7 @@ char *owl_command_unsubscribe(int argc, char **argv, char *buff)
   return(NULL);
 }
 
-char *owl_command_echo(int argc, char **argv, char *buff)
+char *owl_command_echo(int argc, const char *const *argv, const char *buff)
 {
   buff = skiptokens(buff, 1);
   owl_function_popless_text(buff);
@@ -1839,7 +1899,7 @@ void owl_command_status(void)
   owl_function_status();
 }
 
-char *owl_command_zwrite(int argc, char **argv, char *buff)
+char *owl_command_zwrite(int argc, const char *const *argv, const char *buff)
 {
   owl_zwrite z;
 
@@ -1851,9 +1911,10 @@ char *owl_command_zwrite(int argc, char **argv, char *buff)
   owl_zwrite_create_from_line(&z, buff);
   if (owl_zwrite_is_message_set(&z)) {
     owl_function_zwrite(buff, NULL);
-    owl_zwrite_free(&z);
+    owl_zwrite_cleanup(&z);
     return (NULL);
   }
+  owl_zwrite_cleanup(&z);
 
   if (argc < 2) {
     owl_function_makemsg("Not enough arguments to the zwrite command.");
@@ -1863,9 +1924,10 @@ char *owl_command_zwrite(int argc, char **argv, char *buff)
   return(NULL);
 }
 
-char *owl_command_aimwrite(int argc, char **argv, char *buff)
+char *owl_command_aimwrite(int argc, const char *const *argv, const char *buff)
 {
-  char *newbuff, *recip, **myargv;
+  char *newbuff, *recip;
+  const char *const *myargv;
   int i, j, myargc;
   owl_message *m;
   
@@ -1898,19 +1960,18 @@ char *owl_command_aimwrite(int argc, char **argv, char *buff)
       /* Once we have -m, gobble up everything else on the line */
       myargv++;
       myargc--;
-      newbuff=owl_malloc(1);
       newbuff=owl_strdup("");
       while (myargc) {
-	newbuff=realloc(newbuff, strlen(newbuff)+strlen(myargv[0])+5);
+	newbuff=owl_realloc(newbuff, strlen(newbuff)+strlen(myargv[0])+5);
 	strcat(newbuff, myargv[0]);
 	strcat(newbuff, " ");
 	myargc--;
 	myargv++;
       }
-      newbuff[strlen(newbuff)-1]='\0'; /* remove last space */
+      if (strlen(newbuff) >= 1)
+	newbuff[strlen(newbuff) - 1] = '\0'; /* remove last space */
 
-      recip=owl_malloc(strlen(argv[0])+5);
-      sprintf(recip, "%s ", argv[1]);
+      recip=owl_strdup(argv[1]);
       owl_aim_send_im(recip, newbuff);
       m=owl_function_make_outgoing_aim(newbuff, recip);
       if (m) { 
@@ -1942,15 +2003,14 @@ char *owl_command_aimwrite(int argc, char **argv, char *buff)
   return(NULL);
 }
 
-char *owl_command_loopwrite(int argc, char **argv, char *buff)
+char *owl_command_loopwrite(int argc, const char *const *argv, const char *buff)
 {
   owl_function_loopwrite_setup();
   return(NULL);
 }
 
-char *owl_command_zcrypt(int argc, char **argv, char *buff)
+char *owl_command_zcrypt(int argc, const char *const *argv, const char *buff)
 {
-#ifdef OWL_ENABLE_ZCRYPT
   owl_zwrite z;
 
   if (!owl_global_is_havezephyr(&g)) {
@@ -1961,9 +2021,10 @@ char *owl_command_zcrypt(int argc, char **argv, char *buff)
   owl_zwrite_create_from_line(&z, buff);
   if (owl_zwrite_is_message_set(&z)) {
     owl_function_zcrypt(buff, NULL);
-    owl_zwrite_free(&z);
+    owl_zwrite_cleanup(&z);
     return (NULL);
   }
+  owl_zwrite_cleanup(&z);
 
   if (argc < 2) {
     owl_function_makemsg("Not enough arguments to the zcrypt command.");
@@ -1971,12 +2032,9 @@ char *owl_command_zcrypt(int argc, char **argv, char *buff)
     owl_function_zwrite_setup(buff);
   }
   return(NULL);
-#else
-  owl_function_makemsg("This Owl does not support zcrypt");
-#endif
 }
 
-char *owl_command_reply(int argc, char **argv, char *buff)
+char *owl_command_reply(int argc, const char *const *argv, const char *buff)
 {
   int edit=0;
   
@@ -1991,8 +2049,7 @@ char *owl_command_reply(int argc, char **argv, char *buff)
   } else if (argc==2 && !strcmp(argv[1], "sender")) {
     owl_function_reply(1, !edit);
   } else if (argc==2 && !strcmp(argv[1], "zaway")) {
-    owl_message *m;
-    m = owl_global_get_current_message(&g);
+    const owl_message *m = owl_global_get_current_message(&g);
     if (m) owl_zephyr_zaway(m);
   } else {
     owl_function_makemsg("Invalid arguments to the reply command.");
@@ -2000,13 +2057,13 @@ char *owl_command_reply(int argc, char **argv, char *buff)
   return NULL;
 }
 
-char *owl_command_filter(int argc, char **argv, char *buff)
+char *owl_command_filter(int argc, const char *const *argv, const char *buff)
 {
   owl_function_create_filter(argc, argv);
   return NULL;
 }
 
-char *owl_command_zlocate(int argc, char **argv, char *buff)
+char *owl_command_zlocate(int argc, const char *const *argv, const char *buff)
 {
   int auth;
   
@@ -2040,7 +2097,7 @@ char *owl_command_zlocate(int argc, char **argv, char *buff)
  * view -d <expression>
  * view --home
  */
-char *owl_command_view(int argc, char **argv, char *buff)
+char *owl_command_view(int argc, const char *const *argv, const char *buff)
 {
   /* First take the 'view --home' and 'view -r' cases */
   if (argc == 2) {
@@ -2064,10 +2121,10 @@ char *owl_command_view(int argc, char **argv, char *buff)
 
   /* Now get 'view -d <expression>' */
   if (argc>=3 && !strcmp(argv[1], "-d")) {
-    char **myargv;
+    const char **myargv;
     int i;
 
-    myargv=owl_malloc((argc*sizeof(char *))+50);
+    myargv=owl_malloc((argc*sizeof(const char *))+50);
     myargv[0]="";
     myargv[1]="owl-dynamic";
     for (i=2; i<argc; i++) {
@@ -2112,7 +2169,7 @@ char *owl_command_view(int argc, char **argv, char *buff)
       argc--;
       argv++;
     } else if (!strcmp(argv[0], "-r")) {
-      char *foo;
+      const char *foo;
       foo=owl_function_create_negative_filter(owl_view_get_filtname(owl_global_get_current_view(&g)));
       owl_function_change_currentview_filter(foo);
     } else if (!strcmp(argv[0], "-s")) {
@@ -2132,7 +2189,7 @@ char *owl_command_view(int argc, char **argv, char *buff)
   return(NULL);
 }
 
-char *owl_command_show(int argc, char **argv, char *buff)
+char *owl_command_show(int argc, const char *const *argv, const char *buff)
 {
   if (argc<2) {
     owl_function_help_for_command("show");
@@ -2185,7 +2242,7 @@ char *owl_command_show(int argc, char **argv, char *buff)
   } else if (!strcmp(argv[1], "quickstart")) {
     owl_function_show_quickstart();
   } else if (!strcmp(argv[1], "startup")) {
-    char *filename;
+    const char *filename;
     
     filename=owl_global_get_startupfile(&g);
     owl_function_popless_file(filename);
@@ -2198,20 +2255,20 @@ char *owl_command_show(int argc, char **argv, char *buff)
   return NULL;
 }
 
-char *owl_command_viewclass(int argc, char **argv, char *buff)
+char *owl_command_viewclass(int argc, const char *const *argv, const char *buff)
 {
   char *filtname;
   if (argc!=2) {
     owl_function_makemsg("Wrong number of arguments to viewclass command");
     return NULL;
   }
-  filtname = owl_function_classinstfilt(argv[1], NULL);
+  filtname = owl_function_classinstfilt(argv[1], NULL, owl_global_is_narrow_related(&g));
   owl_function_change_currentview_filter(filtname);
   owl_free(filtname);
   return NULL;
 }
 
-char *owl_command_viewuser(int argc, char **argv, char *buff)
+char *owl_command_viewuser(int argc, const char *const *argv, const char *buff)
 {
   char *filtname;
   if (argc!=2) {
@@ -2230,7 +2287,7 @@ void owl_command_pop_message(void)
   owl_function_curmsg_to_popwin();
 }
 
-char *owl_command_delete(int argc, char **argv, char *buff)
+char *owl_command_delete(int argc, const char *const *argv, const char *buff)
 {
   int move_after = 1;
 
@@ -2264,7 +2321,7 @@ char *owl_command_delete(int argc, char **argv, char *buff)
   return NULL;
 }
 
-char *owl_command_undelete(int argc, char **argv, char *buff)
+char *owl_command_undelete(int argc, const char *const *argv, const char *buff)
 {
   int move_after = 1;
 
@@ -2293,12 +2350,12 @@ char *owl_command_undelete(int argc, char **argv, char *buff)
   return NULL;
 }
 
-void owl_command_beep()
+void owl_command_beep(void)
 {
   owl_function_beep();
 }
 
-char *owl_command_colorview(int argc, char **argv, char *buff)
+char *owl_command_colorview(int argc, const char *const *argv, const char *buff)
 {
   if (argc < 2 || argc > 3) {
     owl_function_makemsg("Wrong number of arguments to colorview command");
@@ -2308,38 +2365,38 @@ char *owl_command_colorview(int argc, char **argv, char *buff)
   return NULL;
 }
 
-char *owl_command_colorclass(int argc, char **argv, char *buff)
+char *owl_command_colorclass(int argc, const char *const *argv, const char *buff)
 {
-  char *filtname;
+  const char *filtname;
   
   if (argc < 3 || argc > 4) {
     owl_function_makemsg("Wrong number of arguments to colorclass command");
     return NULL;
   }
 
-  filtname=owl_function_classinstfilt(argv[1], NULL);
+  filtname=owl_function_classinstfilt(argv[1], NULL, owl_global_is_narrow_related(&g));
   (void) owl_function_color_filter(filtname, argv[2], (argc == 4 ? argv[3] : NULL));
   return NULL;
 }
 
-char *owl_command_zpunt(int argc, char **argv, char *buff)
+char *owl_command_zpunt(int argc, const char *const *argv, const char *buff)
 {
   owl_command_zpunt_and_zunpunt(argc, argv, 0);
   return NULL;
 }
 
-char *owl_command_zunpunt(int argc, char **argv, char *buff)
+char *owl_command_zunpunt(int argc, const char *const *argv, const char *buff)
 {
   owl_command_zpunt_and_zunpunt(argc, argv, 1);
   return NULL;
 }
 
-void owl_command_zpunt_and_zunpunt(int argc, char **argv, int type)
+void owl_command_zpunt_and_zunpunt(int argc, const char *const *argv, int type)
 {
   /* if type==0 then zpunt
    * if type==1 then zunpunt
    */
-  char *class, *inst, *recip;
+  const char *class, *inst, *recip;
 
   class="message";
   inst="";
@@ -2371,7 +2428,7 @@ void owl_command_zpunt_and_zunpunt(int argc, char **argv, int type)
   }
 }
 
-char *owl_command_smartzpunt(int argc, char **argv, char *buff)
+char *owl_command_smartzpunt(int argc, const char *const *argv, const char *buff)
 {
   if (argc == 1) {
     owl_function_smartzpunt(0);
@@ -2383,19 +2440,19 @@ char *owl_command_smartzpunt(int argc, char **argv, char *buff)
   return NULL;
 }
 
-char *owl_command_punt(int argc, char **argv, char *buff)
+char *owl_command_punt(int argc, const char *const *argv, const char *buff)
 {
   owl_command_punt_unpunt(argc, argv, buff, 0);
   return NULL;
 }
 
-char *owl_command_unpunt(int argc, char **argv, char *buff)
+char *owl_command_unpunt(int argc, const char *const *argv, const char *buff)
 {
   owl_command_punt_unpunt(argc, argv, buff, 1);
   return NULL;
 }
 
-void owl_command_punt_unpunt(int argc, char ** argv, char *buff, int unpunt)
+void owl_command_punt_unpunt(int argc, const char *const * argv, const char *buff, int unpunt)
 {
   owl_list * fl;
   owl_filter * f;
@@ -2412,36 +2469,36 @@ void owl_command_punt_unpunt(int argc, char ** argv, char *buff, int unpunt)
     if(unpunt && (i=atoi(argv[1])) !=0) {
       i--;      /* Accept 1-based indexing */
       if(i < owl_list_get_size(fl)) {
-        f = (owl_filter*)owl_list_get_element(fl, i);
+        f = owl_list_get_element(fl, i);
         owl_list_remove_element(fl, i);
-        owl_filter_free(f);
+        owl_filter_delete(f);
         return;
       } else {
         owl_function_error("No such filter number: %d", i+1);
       }
     }
     text = owl_sprintf("filter %s", argv[1]);
+    owl_function_punt(text, unpunt);
+    owl_free(text);
   } else {
-    text = skiptokens(buff, 1);
+    owl_function_punt(skiptokens(buff, 1), unpunt);
   }
-
-  owl_function_punt(text, unpunt);
 }
 
 
-char *owl_command_getview(int argc, char **argv, char *buff)
+char *owl_command_getview(int argc, const char *const *argv, const char *buff)
 {
-  char *filtname;
+  const char *filtname;
   if (argc != 1) {
     owl_function_makemsg("Wrong number of arguments for %s", argv[0]);
     return NULL;
   }
   filtname = owl_view_get_filtname(owl_global_get_current_view(&g));
-  if (filtname) filtname = owl_strdup(filtname);
-  return filtname;
+  if (filtname) return owl_strdup(filtname);
+  return NULL;
 }
 
-char *owl_command_getvar(int argc, char **argv, char *buff)
+char *owl_command_getvar(int argc, const char *const *argv, const char *buff)
 {
   char tmpbuff[1024];
   if (argc != 2) {
@@ -2455,9 +2512,9 @@ char *owl_command_getvar(int argc, char **argv, char *buff)
   return owl_strdup(tmpbuff); 
 }
 
-char *owl_command_getfilter(int argc, char **argv, char *buf)
+char *owl_command_getfilter(int argc, const char *const *argv, const char *buf)
 {
-  owl_filter *f;
+  const owl_filter *f;
   if (argc != 2) {
     owl_function_makemsg("Wrong number of arguments for %s", argv[0]);
     return NULL;
@@ -2469,10 +2526,10 @@ char *owl_command_getfilter(int argc, char **argv, char *buf)
   return owl_filter_print(f);
 }
 
-char *owl_command_search(int argc, char **argv, char *buff)
+char *owl_command_search(int argc, const char *const *argv, const char *buff)
 {
   int direction;
-  char *buffstart;
+  const char *buffstart;
 
   direction=OWL_DIRECTION_DOWNWARDS;
   buffstart=skiptokens(buff, 1);
@@ -2490,24 +2547,17 @@ char *owl_command_search(int argc, char **argv, char *buff)
   return(NULL);
 }
 
-char *owl_command_setsearch(int argc, char **argv, char *buff)
+char *owl_command_setsearch(int argc, const char *const *argv, const char *buff)
 {
-  char *buffstart;
+  const char *buffstart;
 
   buffstart=skiptokens(buff, 1);
-
-  owl_global_set_search_active(&g, buffstart);
-
-  if (!*buffstart) {
-    owl_global_set_search_inactive(&g);
-  }
-
-  owl_mainwin_redisplay(owl_global_get_mainwin(&g));
+  owl_function_search_start(*buffstart ? buffstart : NULL, OWL_DIRECTION_NONE);
   
   return(NULL);
 }
 
-char *owl_command_aimlogin(int argc, char **argv, char *buff)
+char *owl_command_aimlogin(int argc, const char *const *argv, const char *buff)
 {
   if ((argc<2) || (argc>3)) {
     owl_function_makemsg("Wrong number of arguments to aimlogin command");
@@ -2516,9 +2566,9 @@ char *owl_command_aimlogin(int argc, char **argv, char *buff)
 
   /* if we get two arguments, ask for the password */
   if (argc==2) {
-    owl_global_set_buffercommand(&g, argv[1]);
-    owl_global_set_buffercallback(&g, &owl_callback_aimlogin);
-    owl_function_start_password("AIM Password: ");
+    owl_editwin *e = owl_function_start_password("AIM Password: ");
+    owl_editwin_set_cbdata(e, owl_strdup(argv[1]), owl_free);
+    owl_editwin_set_callback(e, owl_callback_aimlogin);
     return(NULL);
   } else {
     owl_function_aimlogin(argv[1], argv[2]);
@@ -2528,7 +2578,7 @@ char *owl_command_aimlogin(int argc, char **argv, char *buff)
   return(NULL);
 }
 
-char *owl_command_aimlogout(int argc, char **argv, char *buff)
+char *owl_command_aimlogout(int argc, const char *const *argv, const char *buff)
 {
   /* clear the buddylist */
   owl_buddylist_clear(owl_global_get_buddylist(&g));
@@ -2537,26 +2587,26 @@ char *owl_command_aimlogout(int argc, char **argv, char *buff)
   return(NULL);
 }
 
-char *owl_command_getstyle(int argc, char **argv, char *buff)
+char *owl_command_getstyle(int argc, const char *const *argv, const char *buff)
 {
-  char *stylename;
+  const char *stylename;
   if (argc != 1) {
     owl_function_makemsg("Wrong number of arguments for %s", argv[0]);
     return NULL;
   }
   stylename = owl_style_get_name(owl_global_get_current_style(&g));
-  if (stylename) stylename = owl_strdup(stylename);
-  return stylename;
+  if (stylename) return owl_strdup(stylename);
+  return NULL;
 }
 
-char *owl_command_error(int argc, char **argv, char *buff)
+char *owl_command_error(int argc, const char *const *argv, const char *buff)
 {
     buff = skiptokens(buff, 1);
     owl_function_error("%s", buff);
     return NULL;
 }
 
-char *owl_command_message(int argc, char **argv, char *buff)
+char *owl_command_message(int argc, const char *const *argv, const char *buff)
 {
     buff = skiptokens(buff, 1);
     owl_function_makemsg("%s", buff);
@@ -2573,25 +2623,23 @@ void owl_command_edit_cancel(owl_editwin *e)
 
   owl_function_makemsg("Command cancelled.");
 
-  if(e->echochar == 0) {
+  if(owl_editwin_get_echochar(e) == 0) {
     hist=owl_editwin_get_history(e);
     owl_history_store(hist, owl_editwin_get_text(e));
     owl_history_reset(hist);
   }
 
-  owl_editwin_fullclear(e);
   owl_global_set_needrefresh(&g);
-  wnoutrefresh(owl_editwin_get_curswin(e));
-  owl_global_set_typwin_inactive(&g);
-  owl_editwin_new_style(e, OWL_EDITWIN_STYLE_ONELINE, NULL);
+  owl_global_pop_context(&g);
 
-  owl_function_activate_keymap("recv");
+  owl_global_set_typwin_inactive(&g);
+  owl_editwin_delete(e);
 }
 
 void owl_command_edit_history_prev(owl_editwin *e)
 {
   owl_history *hist;
-  char *ptr;
+  const char *ptr;
 
   hist=owl_editwin_get_history(e);
   if (!owl_history_is_touched(hist)) {
@@ -2602,7 +2650,7 @@ void owl_command_edit_history_prev(owl_editwin *e)
   if (ptr) {
     owl_editwin_clear(e);
     owl_editwin_insert_string(e, ptr);
-    owl_editwin_redisplay(e, 0);
+    owl_editwin_redisplay(e);
     owl_global_set_needrefresh(&g);
   } else {
     owl_function_beep();
@@ -2612,82 +2660,50 @@ void owl_command_edit_history_prev(owl_editwin *e)
 void owl_command_edit_history_next(owl_editwin *e)
 {
   owl_history *hist;
-  char *ptr;
+  const char *ptr;
 
   hist=owl_editwin_get_history(e);
   ptr=owl_history_get_next(hist);
   if (ptr) {
     owl_editwin_clear(e);
     owl_editwin_insert_string(e, ptr);
-    owl_editwin_redisplay(e, 0);
+    owl_editwin_redisplay(e);
     owl_global_set_needrefresh(&g);
   } else {
     owl_function_beep();
   }
 }
 
-char *owl_command_edit_insert_text(owl_editwin *e, int argc, char **argv, char *buff)
+char *owl_command_edit_insert_text(owl_editwin *e, int argc, const char *const *argv, const char *buff)
 {
   buff = skiptokens(buff, 1);
   owl_editwin_insert_string(e, buff);
-  owl_editwin_redisplay(e, 0);
+  owl_editwin_redisplay(e);
   owl_global_set_needrefresh(&g);  
   return NULL;
 }
 
-void owl_command_editline_done(owl_editwin *e)
+void owl_command_edit_done(owl_editwin *e)
 {
   owl_history *hist=owl_editwin_get_history(e);
-  char *rv, *cmd;
 
-  owl_history_store(hist, owl_editwin_get_text(e));
-  owl_history_reset(hist);
-  owl_global_set_typwin_inactive(&g);
-  cmd = owl_strdup(owl_editwin_get_text(e));
-  owl_editwin_fullclear(e);
-  rv = owl_function_command(cmd);
-  owl_free(cmd);
-
-  wnoutrefresh(owl_editwin_get_curswin(e));
-  owl_global_set_needrefresh(&g);
-
-  if (rv) {
-    owl_function_makemsg("%s", rv);
-    owl_free(rv);
+  if (hist) {
+    owl_history_store(hist, owl_editwin_get_text(e));
+    owl_history_reset(hist);
   }
-}
-
-
-void owl_command_editresponse_done(owl_editwin *e)
-{
-  owl_function_run_buffercommand();
 
   owl_global_set_typwin_inactive(&g);
-  owl_editwin_fullclear(e);
-  wnoutrefresh(owl_editwin_get_curswin(e));
+  owl_global_pop_context(&g);
   owl_global_set_needrefresh(&g);
+
+  owl_editwin_do_callback(e);
+  owl_editwin_delete(e);
 }
 
-
-void owl_command_editmulti_done(owl_editwin *e)
-{
-  owl_history *hist=owl_editwin_get_history(e);
-
-  owl_history_store(hist, owl_editwin_get_text(e));
-  owl_history_reset(hist);
-
-  owl_function_run_buffercommand();
-  owl_editwin_new_style(e, OWL_EDITWIN_STYLE_ONELINE, NULL);
-  owl_editwin_fullclear(e);
-  owl_global_set_typwin_inactive(&g);
-  owl_global_set_needrefresh(&g);
-  wnoutrefresh(owl_editwin_get_curswin(e));
-}
-
-void owl_command_editmulti_done_or_delete(owl_editwin *e)
+void owl_command_edit_done_or_delete(owl_editwin *e)
 {
   if (owl_editwin_is_at_end(e)) {
-    owl_command_editmulti_done(e);
+    owl_command_edit_done(e);
   } else {
     owl_editwin_delete_char(e);
   }
@@ -2701,6 +2717,7 @@ void owl_command_editmulti_done_or_delete(owl_editwin *e)
 void owl_command_popless_quit(owl_viewwin *vw)
 {
   owl_popwin_close(owl_global_get_popwin(&g));
-  owl_viewwin_free(vw);
+  owl_global_pop_context(&g);
+  owl_viewwin_cleanup(vw);
   owl_global_set_needrefresh(&g);
 }

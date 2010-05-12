@@ -3,6 +3,9 @@ use warnings;
 
 package BarnOwl::Hooks;
 
+use Carp;
+use List::Util qw(first);
+
 =head1 BarnOwl::Hooks
 
 =head1 DESCRIPTION
@@ -107,6 +110,24 @@ sub _load_perl_commands {
                            summary => 'Answer no to a question',
                            usage   => 'no',
                        });
+    BarnOwl::new_command('edit:complete' => \&BarnOwl::Completion::do_complete,
+                       {
+                           summary     => "Complete the word at point",
+                           usage       => "complete",
+                           description =>
+                           "This is the function responsible for tab-completion."
+                       });
+    BarnOwl::new_command('edit:help' => \&BarnOwl::Help::show_help,
+                       {
+                           summary     => "Display help for the current command",
+                           usage       => "help",
+                           description =>
+                           "Opens the help information on the current command.\n" .
+                           "Returns to the previous editing context afterwards.\n\n" .
+                           "SEE ALSO: help"
+                         });
+    BarnOwl::bindkey(editline => TAB => command => 'edit:complete');
+    BarnOwl::bindkey(editline => 'M-h' => command => 'edit:help');
 }
 
 sub _load_owlconf {
@@ -187,7 +208,9 @@ sub _mainloop_hook {
 }
 
 sub _get_blist {
-    return join("\n", $getBuddyList->run);
+    my @results = grep defined, $getBuddyList->run;
+    s/^\s+|\s+$//sg for (@results);
+    return join("\n", grep {length($_)} @results);
 }
 
 sub _invalidate_filter {
@@ -199,5 +222,48 @@ sub _get_quickstart {
     return join("\n", $getQuickstart->run);
 }
 
+sub _new_command {
+    my $command = shift;
+    (my $symbol = $command) =~ s/-/_/g;
+    my $package = "BarnOwl";
+
+
+    if(!contains(\@BarnOwl::all_commands, $command)) {
+        push @BarnOwl::all_commands, $command;
+    }
+
+    if($symbol =~ m{^edit:(.+)$}) {
+        $symbol = $1;
+        $package = "BarnOwl::Editwin";
+    } else {
+        $symbol =~ s/:/_/;
+    }
+    {
+        no strict 'refs';
+        if(defined(*{"${package}::${symbol}"}{CODE})) {
+            return;
+        }
+        *{"${package}::${symbol}"} = sub {
+            if(@_ == 1 && $_[0] =~ m{\s}) {
+                carp "DEPRECATED: ${package}::${symbol}: Tokenizing argument on ' '.\n"
+                . "In future versions, the argument list will be passed to\n"
+                . "'$command' directly. Tokenize yourself, or use BarnOwl::command()\n";
+                BarnOwl::command("$command $_[0]");
+            } else {
+                BarnOwl::command($command, @_);
+            }
+          };
+        if(defined(*{"${package}::EXPORT_OK"}{ARRAY})
+          && !contains(*{"${package}::EXPORT_OK"}{ARRAY}, $symbol)) {
+            push @{*{"${package}::EXPORT_OK"}{ARRAY}}, $symbol;
+        }
+    }
+}
+
+sub contains {
+    my $list = shift;
+    my $what = shift;
+    return defined(first {$_ eq $what} @$list);
+}
 
 1;

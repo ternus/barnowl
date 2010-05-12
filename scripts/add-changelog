@@ -1,0 +1,16 @@
+#!/bin/sh
+version=$1;
+
+if [ -z "$version" ] || [ "$#" -lt 2 ];  then
+    echo "Usage: $0 VERSION REV-LIST-ARGS" >&2
+    exit 1;
+fi
+
+shift
+
+(
+    echo $version;
+    git log --no-merges --format=' * %s -%ae' "$@"
+    echo
+    cat ChangeLog
+) | sponge ChangeLog

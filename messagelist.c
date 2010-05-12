@@ -1,16 +1,14 @@
 #define OWL_PERL
 #include "owl.h"
 
-static const char fileIdent[] = "$Id$";
-
-owl_messagelist * owl_messagelist_new() {
+owl_messagelist * owl_messagelist_new(void) {
   return (owl_messagelist*)owl_perl_new("BarnOwl::MessageList");
 }
 
-int owl_messagelist_get_size(owl_messagelist *ml)
+int owl_messagelist_get_size(const owl_messagelist *ml)
 {
   int size;
-  OWL_PERL_CALL_METHOD(ml, "get_size",
+  OWL_PERL_CALL_METHOD(ro_sv(ml), "get_size",
                        , // No arguments
                        // Error message
                        "Error in get_size: %s",
@@ -22,10 +20,10 @@ int owl_messagelist_get_size(owl_messagelist *ml)
   return size;
 }
 
-owl_message *owl_messagelist_get_by_id(owl_messagelist *ml, int target_id)
+owl_message *owl_messagelist_get_by_id(const owl_messagelist *ml, int target_id)
 {
   SV *msg;
-  OWL_PERL_CALL_METHOD(ml, "get_by_id",
+  OWL_PERL_CALL_METHOD(ro_sv(ml), "get_by_id",
                        mXPUSHi(target_id); ,
                        // Error
                        "Error in get_by_id: %s",
@@ -61,7 +59,7 @@ void owl_messagelist_expunge(owl_messagelist *ml)
                        );
 }
 
-void owl_messagelist_invalidate_formats(owl_messagelist *ml)
+void owl_messagelist_invalidate_formats(const owl_messagelist *ml)
 {
   owl_global_next_fmtext_seq(&g);
 }

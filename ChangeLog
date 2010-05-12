@@ -1,3 +1,188 @@
+1.6
+ * Support filtering on whether a message has been deleted. -nelhage@mit.edu
+ * Properly quote strings containing newlines or tabs. -nelhage@mit.edu
+ * Check for an unset mark in owl_editwin_replace_region. -nelhage@mit.edu
+ * Add the "narrow-related" variable. -geofft@mit.edu
+ * Fix a display bug under perl 5.12. -nelhage@mit.edu
+ * Only use typewindelta when opening multiline editwins. -nelhage@ksplice.com
+ * Add some checks to ./configure. -nelhage@mit.edu
+ * Fix a use-after-free in popexec.c -nelhage@mit.edu
+ * Make pseudologins asynchronous -asedeno@mit.edu
+ * Fix some bugs in editwin handling and clean up code. -nelhage@ksplice.com
+ * Add new command unbindkey for removing keybindings -leonidg@mit.edu
+ * zcrypt: Implement AES encryption support using GPG. -nelhage@mit.edu
+ * Add usage messages to everything in scripts/ -nelhage@mit.edu
+ * Split zcrypt into an external, standalong binary. -nelhage@mit.edu
+ * Fix minor documentation typo -alexmv@mit.edu
+ * Document the init/cleanup vs. new/delete naming conventions. -andersk@mit.edu
+ * Clean up code naming conventions to help avoid memory leaks.. -andersk@mit.edu
+ * Add edit:help command for zsh-style in-edit help -davidben@mit.edu
+ * Use libpanel to simplify and improve display layer. -davidben@mit.edu
+ * Jabber: Mention [-a <account>] in :help jwrite. -andersk@mit.edu
+ * Fix zcrypt when compiling without krb4 -oremanj@MIT.EDU
+ * Send multiple PRIVMSGs for IRC messages entered as multiple paragraphs -oremanj@mit.edu
+ * Require automake ≥ 1.7.0, and don’t warn about portability to non-GNU make. -andersk@mit.edu
+ * Makefile.am: Use only direct children in SUBDIRS, to appease automake 1.7. -andersk@mit.edu
+ * IRC: irc-disconnect on a pending reconnect should cancel it. -nelhage@mit.edu
+ * Complete several commands that accept a filename. -nelhage@mit.edu
+ * Complete the 'print' and 'bindkey' commands. -nelhage@mit.edu
+
+1.5.1
+ * Fix numerous memory leaks. -andersk@mit.edu
+ * owl_message_get_cc_without_recipient: Don’t overflow the output buffer. -andersk@mit.edu
+        (Fixes CVE-2010-0793)
+ * owl_command_aimwrite: Fix a buffer overflow on aimwrite -m. -andersk@mit.edu
+ * zcrypt: Don’t read off the end of misaligned input messages. -andersk@mit.edu
+ * Fix zcrypt when compiling without krb4 -oremanj@MIT.EDU
+ * Fix a crash narrowing to certain messages. -andersk@mit.edu
+ * Fix a subtle bug in the perl bindings. -nelhage@mit.edu
+ * Squelch an 'uninitialized' warning in recv:shift-left. -nelhage@mit.edu
+
+1.5
+ * Show the prompt in short editwins when scrolling back to the start. -nelhage@mit.edu
+ * Improve handling of some Jabber messages. -asedeno@mit.edu
+ * Allow ^Z to be rebound. -nelhage@mit.edu
+ * Skip some IRC admin messages by default, controlled by irc:skip -alexmv@mit.edu
+ * Reconnect and re-join channels on IRC disconnect -alexmv@mit.edu
+ * Correct the --with-libzephyr help string to --with-zephyr. -andersk@mit.edu
+ * Improve performance narrowing to certain filters. -nelhage@mit.edu
+ * Add completion for :filter* -adehnert@mit.edu
+ * Fix filter* -adehnert@mit.edu
+ * Mark the current mark with an asterisk -davidben@mit.edu
+ * Complete class names for the 'unsub' command. -nelhage@mit.edu
+ * Make control characters human-readable -kcr@1ts.org
+ * Further complete the show command -davidben@mit.edu
+ * Fix a bug reflowing text in the editwin. -davidben@mit.edu
+ * Reconnect to MUCs when reconnecting to Jabber. -asedeno@mit.edu
+ * Fix spurious trailing newlines in zsigs. -andersk@mit.edu
+ * Fix the behavior of the zsig variable.  -kcr@1ts.org
+ * Drop owl_animate_hack. -asedeno@mit.edu
+ * Add IRC server and channel listing to buddylist -alexmv@mit.edu
+ * Make Jabber try to reconnect when disconnected, at exponential intervals -alexmv@mit.edu
+ * Better documentation for jabberlogout. -asedeno@mit.edu
+ * jabberlogout -a --> jabberlogout -A -asedeno@mit.edu
+ * Change the default jabber resource to 'barnowl' -asedeno@mit.edu
+ * Updated Jabber documentation for consistency. -zhangc@mit.edu
+ * Document :bindkey more clearly. -geofft@mit.edu
+
+1.4
+ * Fix description of edit:history-next -davidben@mit.edu
+ * Don’t loop infinitely on matching the empty string. -andersk@mit.edu
+ * Fix a typo in the jroster help message. -asedeno@mit.edu
+ * IRC: Handle 'nosuchchannel' events. -nelhage@mit.edu
+ * Add a function for perl to query whether Zephyr is available. -nelhage@mit.edu
+ * Add a perl hook that is called once Zephyr is initialized. -nelhage@mit.edu
+ * AIM: Decode incoming messages properly. -nelhage@mit.edu
+ * AIM: Correctly send outgoing IMs with high-bit characters. -nelhage@mit.edu
+ * IRC: Encode outgoing messages as utf-8. -nelhage@mit.edu
+ * Return unicode strings to perl. -nelhage@mit.edu
+ * IRC: Fix '-a' with commands that take a channel. -nelhage@mit.edu
+ * Catch ^Z and display a message instead of suspending. -nelhage@mit.edu
+ * Fix missing commands from command completion. -nelhage@mit.edu
+ * Make kill-region stop killing extra bytes after multibyte characters. -andersk@mit.edu
+ * Squelch some 'uninitialized' warnings in IRC completion. -nelhage@mit.edu
+ * Add minimal completion for 'aimwrite'. -nelhage@mit.edu
+ * Zephyr completion: Convert fields to lowercase for completing. -nelhage@mit.edu
+ * Implement a shift_words method on completion contexts. -nelhage@mit.edu
+ * Export skiptokens to perl. -nelhage@mit.edu
+ * owl_text_quote: Don’t leak a kretch-sized buffer. -andersk@mit.edu
+ * Spread the background color across the right hand side of messages -kcr@1ts.org
+ * Perl callout for zsig computation + move default to perl -kcr@1ts.org
+ * BarnOwl::get_zephyr_variable gets you a .zephyr.vars variable -kcr@1ts.org
+ * Correctly prototype functions with no parameters as foo(void), not foo(). -andersk@mit.edu
+ * Cause unsub to warn user if user wasn't subbed -davidben@mit.edu
+ * Refresh popwin border when we redisplay viewwin -davidben@mit.edu
+ * owl_command_zcrypt: Fix a compile warning building without zcrypt. -nelhage@mit.edu
+ * Compile with warnings enabled by default. -andersk@mit.edu
+ * Add equivalent long options for all short options. -nelhage@mit.edu
+ * Remove defunct TODO and BUGS files. -nelhage@mit.edu
+ * editwin: Properly update points inside a replaced region. -nelhage@mit.edu
+ * Shift-R on CC zephyrs should go to the sender only -adehnert@mit.edu
+ * BarnOwl::Module::Jabber: Quote jroster auth, deauth commands. -andersk@mit.edu
+ * Use automake’s silent-rules mode if available, for quieter build output. -andersk@mit.edu
+ * Add configurable time display -adehnert@mit.edu
+ * Add BarnOwl::redisplay() -asedeno@mit.edu
+ * Bind C-v and M-v in popless windows -nelhage@mit.edu
+ * Fix an off by one error in some editwin code. -asedeno@mit.edu
+ * Make zdots work even if the buffer has trailing whitespace. -nelhage@mit.edu
+ * Fix pseudo-login interation with zephyr initialization. -asedeno@mit.edu
+ * Correct the --with-libzephyr help message in the configure script. -broder@mit.edu
+ * Set the UTF-8 flag on on strings we pass to Perl. -nelhage@mit.edu
+   * aim.c, perlconfig.c: Fix format string bugs. -andersk@mit.edu
+ * BarnOwl::Completion: Use multi-argument quote. -andersk@mit.edu
+ * Jabber: Add quoting for editwin prompt. -andersk@mit.edu
+ * IRC: Add quoting for reply commands and editwin prompt. -andersk@mit.edu
+ * Fix quoting for filterappend, filterand, filteror. -andersk@mit.edu
+ * skiptokens: Handle quotes more correctly. -nelhage@mit.edu
+
+1.3
+ * Clean up the edit window code significantly. -kcr
+ * Support inputting tabs in the editwin. -kcr
+ * Support C-y for yanking text in the editwin. -kcr
+ * Implement some convenience commands for working with filters. -adehnert
+ * IRC: Fix "ARRAY(0x...)" at the start of 'whois' output. -nelhage
+ * Expands tabs to 8 spaces in incoming and outgoing messages. -nelhage
+ * Make 'zwrite -C ... -m ...' add a CC: line. -nelhage
+ * Switch the build system to use automake. -nelhage
+ * Make BarnOwl::$COMMAND to warn if it tokenizes its arguments. -nelhage
+ * Expose more editwin functionality to perl. -nelhage
+ * Quash a zephyr 3 warning by adding some missing consts. -andersk
+ * Fix crash on malformed multi command. -andersk
+ * owl_command_punt_unpunt: Plug memory leak. -andersk
+ * stderr_redirect_handler: Plug a memory leak. -andersk
+ * Jabber: Sort roster entries. -asedeno
+ * Get rid of a whole bunch of useless casts. -andersk
+ * Reimplement search in terms of owl_regex. -andersk
+ * Export owl_function_debugmsg to perl as BarnOwl::debug(). -nelhage
+ * Implement a tab-completion framework. -nelhage
+ * Tab-complete commands. -nelhage
+ * Tab-complete zephyr commands. -nelhage
+ * Tab-complete help command. -davidben
+ * Tab-complete :jwrite. -asedeno
+ * Tab-complete :filter. -davidben
+ * Tab-complete IRC commands. -broder
+ * Tab-complete the :show command. nelhage
+ * Tab-complete :vu and :vc. -nelhage
+ * Tab-complete :set and :getvar. -davidben
+ * Tab-complete :view. -davidben
+ * Improve JID resolution. -asedeno
+ * Quash some unused variable warnings building --without-zephyr. -andersk
+ * Use 'const' modifiers in the source where appropriate. -andersk
+
+1.2.1
+ * Fix building with Zephyr support. -nelhage
+ * Support --with-stack-protector in 'configure'. -nelhage
+
+1.2
+ * Fix some typos in source and messages. -adehnert
+ * Support an explicit --with{out,}-zephyr configure option. -nelhage
+ * Display a nicer error in :blist if .anyone doesn't exist. -geofft
+ * Don't zcrypt shift-R replies to zcrypted messages -adehnert
+ * Export a time_t for messages to perl as 'unix_time' -nelhage
+ * Get rid of cryptic numeric messages after IRC commands. -ezyang
+ * IRC: Include IRC admin messages in the 'irc' filter. -geofft
+ * Fix M-LEFT and M-RIGHT bindings. -nelhage
+ * Fix replycmd to use right class/instance -adehnert
+ * Allow SIGINT to interrupt getting the Zephyr buddy list -nelhage
+ * Break perlwrap.pm into multiple files. -nelhage
+ * Handle errors in perlwrap.pm better. -nelhage
+ * Don't attempt to send a Zephyr logout if we never initialized Zephyr. -nelhage
+ * Display personals better in OneLine mode. -adehnert
+ * Display context for pings -adehnert
+ * Support --program-{prefix,suffix,transform}. -nelhage
+ * Send instanced pings and give useful error messages -adehnert
+ * Add <message,*,%me%> to default Barnowl subs. -adehnert
+ * Maintain instance when using shift-R on personals -adehnert
+ * Improve handling of outgoing instanced personals -adehnert
+ * Don't require personals to be -i personal. -geofft
+ * Display context for personals, so as to make <message,*,%me> usable. -geofft
+ * Implement mark and swap in the message list. -asedeno
+ * Fix handling of C-SPACE. -nelhage
+ * Fix some warnings. -nelhage
+ * Handle SIGINT, and make ^C interrupt searches. -nelhage
+ * Fix the usage line for punt/unpunt -nelhage
+ * Small bugfixes to release scripts. -nelhage
+
 1.1.1
  * Fix bogus errors 'subscribing to login messages'. -nelhage
  * Correctly send Zephyr login notices at startup. -nelhage

@@ -4,11 +4,9 @@
 #include <ctype.h>
 #include "owl.h"
 
-static const char fileIdent[] = "$Id$";
-
-void owl_text_indent(char *out, char *in, int n)
+void owl_text_indent(char *out, const char *in, int n)
 {
-  char *ptr1, *ptr2, *last;
+  const char *ptr1, *ptr2, *last;
   int i;
 
   strcpy(out, "");
@@ -30,7 +28,7 @@ void owl_text_indent(char *out, char *in, int n)
   }
 }
 
-int owl_text_num_lines(char *in)
+int owl_text_num_lines(const char *in)
 {
   int lines, i;
 
@@ -47,9 +45,10 @@ int owl_text_num_lines(char *in)
 
 
 /* caller must free the return */
-char *owl_text_htmlstrip(char *in)
+char *owl_text_htmlstrip(const char *in)
 {
-  char *ptr1, *end, *ptr2, *ptr3, *out, *out2;
+  const char *ptr1, *end, *ptr2, *ptr3;
+  char *out, *out2;
 
   out=owl_malloc(strlen(in)+30);
   strcpy(out, "");
@@ -126,8 +125,69 @@ char *owl_text_htmlstrip(char *in)
   return(out2);
 }
 
+#define OWL_TAB_WIDTH 8
+
+/* Caller must free return */
+char *owl_text_expand_tabs(const char *in)
+{
+  int len = 0;
+  const char *p = in;
+  char *ret, *out;
+  int col;
+
+  col = 0;
+  while(*p) {
+    gunichar c = g_utf8_get_char(p);
+    char *q = g_utf8_next_char(p);
+    switch (c) {
+    case '\t':
+      do { len++; col++; } while (col % OWL_TAB_WIDTH);
+      p = q;
+      continue;
+    case '\n':
+      col = 0;
+      break;
+    default:
+      col += mk_wcwidth(c);
+      break;
+    }
+    len += q - p;
+    p = q;
+  }
+
+  ret = owl_malloc(len + 1);
+
+  p = in;
+  out = ret;
+
+  col = 0;
+  while(*p) {
+    gunichar c = g_utf8_get_char(p);
+    char *q = g_utf8_next_char(p);
+    switch (c) {
+    case '\t':
+      do {*(out++) = ' '; col++; } while (col % OWL_TAB_WIDTH);
+      p = q;
+      continue;
+    case '\n':
+      col = 0;
+      break;
+    default:
+      col += mk_wcwidth(c);
+      break;
+    }
+    memcpy(out, p, q - p);
+    out += q - p;
+    p = q;
+  }
+
+  *out = 0;
+
+  return ret;
+}
+
 /* caller must free the return */
-char *owl_text_wordwrap(char *in, int col)
+char *owl_text_wordwrap(const char *in, int col)
 {
   char *out;
   int cur, lastspace, len, lastnewline;
@@ -187,29 +247,11 @@ void owl_text_wordunwrap(char *in)
   }
 }
 
-/* exactly like strstr but case insensitive */
-char *stristr(char *a, char *b)
-{
-  char *x, *y;
-  char *ret = NULL;
-  if ((x = g_utf8_casefold(a, -1)) != NULL) {
-    if ((y = g_utf8_casefold(b, -1)) != NULL) {
-      ret = strstr(x, y);
-      if (ret != NULL) {
-	ret = ret - x + a;
-      }
-      g_free(y);
-    }
-    g_free(x);
-  }
-  return(ret);
-}
-
 /* return 1 if a string is only whitespace, otherwise 0 */
-int only_whitespace(char *s)
+int only_whitespace(const char *s)
 {
   if (g_utf8_validate(s,-1,NULL)) {
-    char *p;
+    const char *p;
     for(p = s; p[0]; p=g_utf8_next_char(p)) {
       if (!g_unichar_isspace(g_utf8_get_char(p))) return 0;
     }
@@ -223,12 +265,12 @@ int only_whitespace(char *s)
   return(1);
 }
 
-char *owl_getquoting(char *line)
+const char *owl_getquoting(const char *line)
 {
   if (line[0]=='\0') return("'");
   if (strchr(line, '\'')) return("\"");
   if (strchr(line, '"')) return("'");
-  if (strchr(line, ' ')) return("'");
+  if (strcspn(line, "\n\t ") != strlen(line)) return("'");
   return("");
 }
 
@@ -236,7 +278,7 @@ char *owl_getquoting(char *line)
  * Does not currently handle backslash quoting, but may in the future.
  * Caller must free returned string.
  */
-char *owl_text_substitute(char *in, char *from, char *to)
+char *owl_text_substitute(const char *in, const char *from, const char *to)
 {
   
   char *out;
@@ -286,7 +328,7 @@ void owl_text_tr(char *buff, char a, char b)
  * permissable for a character in 'quotestr' to be in 'toquote'.
  * On success returns the string, on error returns NULL.
  */
-char *owl_text_quote(char *in, char *toquote, char *quotestr)
+char *owl_text_quote(const char *in, const char *toquote, const char *quotestr)
 {
   int i, x, r, place, escape;
   int in_len, toquote_len, quotestr_len;
@@ -295,7 +337,6 @@ char *owl_text_quote(char *in, char *toquote, char *quotestr)
   in_len=strlen(in);
   toquote_len=strlen(toquote);
   quotestr_len=strlen(quotestr);
-  out=owl_malloc((in_len*quotestr_len)+30);
   place=0;
   escape = 0;
   for (i=0; i<in_len; i++) {

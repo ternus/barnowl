@@ -2,11 +2,9 @@
 #include <string.h>
 #include "owl.h"
 
-static const char fileIdent[] = "$Id$";
-
-static struct _owl_keypress_specialmap {
+static const struct _owl_keypress_specialmap {
   int   kj;
-  char *ks;
+  const char *ks;
 } specialmap[] = {
 #ifdef KEY_CODE_YES
    { KEY_CODE_YES, 	"CODE_YES" }, 
@@ -122,7 +120,8 @@ static struct _owl_keypress_specialmap {
    { 27, 	        "ESCAPE" }, 
    { 127, 	        "DELETE" }, 
    { '\r', 	        "CR" }, 
-   { '\n', 	        "LF" }, 
+   { '\n', 	        "LF" },
+   { '\t', 	        "TAB" }, 
    { 0,                 NULL }
 };
 
@@ -133,7 +132,7 @@ static struct _owl_keypress_specialmap {
 int owl_keypress_tostring(int j, int esc, char *buff, int bufflen)
 {
   char kb[64], kb2[2];
-  struct _owl_keypress_specialmap *sm;
+  const struct _owl_keypress_specialmap *sm;
 
   *kb = '\0';
   for (sm = specialmap; sm->kj!=0; sm++) {
@@ -175,9 +174,9 @@ int owl_keypress_tostring(int j, int esc, char *buff, int bufflen)
 
 
 /* returns ERR on failure, else a keycode */
-int owl_keypress_fromstring(char *kb)
+int owl_keypress_fromstring(const char *kb)
 {
-  struct _owl_keypress_specialmap *sm;
+  const struct _owl_keypress_specialmap *sm;
   int ismeta=0, isctrl=0;
   int j = ERR;
 

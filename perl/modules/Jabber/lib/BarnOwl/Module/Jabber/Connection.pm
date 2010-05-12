@@ -42,6 +42,7 @@ L<Net::Jabber::MUC/new> and L<Net::Jabber::MUC/Connect>
 sub MUCJoin {
     my $self = shift;
     my $muc = Net::Jabber::MUC->new(connection => $self, @_);
+    $muc->{ARGS} = @_; # Save these for later
     $muc->Join(@_);
 
     # Add MUC to list of MUCs, unless we're just changing nicks.
@@ -141,11 +142,65 @@ Non-blocking connection processing. For use in a select loop.
 
 sub OwlProcess {
     my $self = shift;
+    my $jid = shift || $self->{SESSION}->{FULLJID};
     my $status = $self->Process(0);
     if ( !defined($status) ) {
-        my $jid = $self->{SESSION}->{FULLJID};
-        BarnOwl::error("Jabber account $jid disconnected!");
-        BarnOwl::Module::Jabber::do_logout($jid);
+        $BarnOwl::Module::Jabber::conn->scheduleReconnect($jid);
+    }
+}
+
+=head2 Disconnect
+
+Work around a bug in Net::Jabber::Client where Process' return status
+is not cleared on disconnect.
+
+=cut
+
+sub Disconnect {
+    my $self = shift;
+    delete $self->{PROCESSERROR};
+    return $self->SUPER::Disconnect(@_);
+}
+
+=head2 OnConnect
+
+Actions to perform on connecting and reconnecting.
+
+=cut
+
+sub onConnect {
+    my $self = shift;
+    my $conn = shift;
+    my $jidStr = shift;
+
+    my $fullJid = $self->{SESSION}->{FULLJID} || $jidStr;
+    my $roster = $conn->getRosterFromJID($jidStr);
+
+    $roster->fetch();
+    $self->PresenceSend( priority => 1 );
+
+    $conn->renameConnection($jidStr, $fullJid);
+    BarnOwl::admin_message('Jabber', "Connected to jabber as $fullJid");
+    # The remove_io_dispatch() method is called from the
+    # ConnectionManager's removeConnection() method.
+    $self->{fileno} = $self->getSocket()->fileno();
+    BarnOwl::add_io_dispatch($self->{fileno}, 'r', sub { $self->OwlProcess($fullJid) });
+
+    # populate completion from roster.
+    for my $buddy ( $roster->jids('all') ) {
+        my %jq  = $roster->query($buddy);
+        my $name = $jq{name} || $buddy->GetUserID();
+        $BarnOwl::Module::Jabber::completion_jids{$name} = 1;
+        $BarnOwl::Module::Jabber::completion_jids{$buddy->GetJID()} = 1;
+    }
+    $BarnOwl::Module::Jabber::vars{idletime} |= BarnOwl::getidletime();
+    unless (exists $BarnOwl::Module::Jabber::vars{keepAliveTimer}) {
+        $BarnOwl::Module::Jabber::vars{keepAliveTimer} =
+            BarnOwl::Timer->new({
+                'after' => 5,
+                'interval' => 5,
+                'cb' => sub { BarnOwl::Module::Jabber::do_keep_alive_and_auto_away(@_) }
+                                });
     }
 }
 

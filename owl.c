@@ -1,4 +1,4 @@
-/*  Copyright (c) 2006-2009 The BarnOwl Developers. All rights reserved.
+/*  Copyright (c) 2006-2010 The BarnOwl Developers. All rights reserved.
  *  Copyright (c) 2004 James Kretchmar. All rights reserved.
  *
  *  This program is free software. You can redistribute it and/or
@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <unistd.h>
+#include <getopt.h>
 #include <stdlib.h>
 #include <string.h>
 #include <signal.h>
@@ -33,134 +34,83 @@ int stderr_replace(void);
 
 #define STDIN 0
 
-static const char fileIdent[] = "$Id$";
-
 owl_global g;
 
-int main(int argc, char **argv, char **env)
-{
-  WINDOW *recwin, *sepwin, *typwin, *msgwin;
-  owl_editwin *tw;
-  owl_popwin *pw;
-  int debug, argcsave, followlast;
-  int newmsgs, nexttimediff;
-  struct sigaction sigact;
-  char *configfile, *tty, *perlout, *perlerr, **argvsave;
+typedef struct _owl_options {
+  bool load_initial_subs;
+  char *configfile;
+  char *tty;
   char *confdir;
-  owl_filter *f;
-  owl_style *s;
-  time_t nexttime, now;
-  struct tm *today;
-  char *dir;
-  struct termios tio;
-  owl_message *m;
+  bool debug;
+  bool rm_debug;
+} owl_options;
 
-  if (!GLIB_CHECK_VERSION (2, 12, 0))
-    g_error ("GLib version 2.12.0 or above is needed.");
+void usage(void)
+{
+  fprintf(stderr, "Barnowl version %s\n", OWL_VERSION_STRING);
+  fprintf(stderr, "Usage: barnowl [-n] [-d] [-D] [-v] [-h] [-c <configfile>] [-s <confdir>] [-t <ttyname>]\n");
+  fprintf(stderr, "  -n,--no-subs        don't load zephyr subscriptions\n");
+  fprintf(stderr, "  -d,--debug          enable debugging\n");
+  fprintf(stderr, "  -D,--remove-debug   enable debugging and delete previous debug file\n");
+  fprintf(stderr, "  -v,--version        print the Barnowl version number and exit\n");
+  fprintf(stderr, "  -h,--help           print this help message\n");
+  fprintf(stderr, "  -c,--config-file    specify an alternate config file\n");
+  fprintf(stderr, "  -s,--config-dir     specify an alternate config dir (default ~/.owl)\n");
+  fprintf(stderr, "  -t,--tty            set the tty name\n");
+}
 
-  argcsave=argc;
-  argvsave=argv;
-  configfile=NULL;
-  confdir = NULL;
-  tty=NULL;
-  debug=0;
-  g.load_initial_subs = 1;
+/* TODO: free owl_options after init is done? */
+void owl_parse_options(int argc, char *argv[], owl_options *opts) {
+  static const struct option long_options[] = {
+    { "no-subs",         0, 0, 'n' },
+    { "config-file",     1, 0, 'c' },
+    { "config-dir",      1, 0, 's' },
+    { "tty",             1, 0, 't' },
+    { "debug",           0, 0, 'd' },
+    { "remove-debug",    0, 0, 'D' },
+    { "version",         0, 0, 'v' },
+    { "help",            0, 0, 'h' },
+    { NULL, 0, NULL, 0}
+  };
+  char c;
 
-  setlocale(LC_ALL, "");
-  
-  if (argc>0) {
-    argv++;
-    argc--;
-  }
-  while (argc>0) {
-    if (!strcmp(argv[0], "-n")) {
-      g.load_initial_subs = 0;
-      argv++;
-      argc--;
-    } else if (!strcmp(argv[0], "-c")) {
-      if (argc<2) {
-        fprintf(stderr, "Too few arguments to -c\n");
-        usage();
-        exit(1);
-      }
-      configfile=argv[1];
-      argv+=2;
-      argc-=2;
-    } else if (!strcmp(argv[0], "-t")) {
-      if (argc<2) {
-        fprintf(stderr, "Too few arguments to -t\n");
-        usage();
-        exit(1);
-      }
-      tty=argv[1];
-      argv+=2;
-      argc-=2;
-    } else if (!strcmp(argv[0], "-s")){
-      if (argc<2) {
-        fprintf(stderr, "Too few arguments to -s\n");
-        usage();
-        exit(1);
-      }
-      confdir = argv[1];
-      argv+=2;
-      argc-=2;
-    } else if (!strcmp(argv[0], "-d")) {
-      debug=1;
-      argv++;
-      argc--;
-    } else if (!strcmp(argv[0], "-D")) {
-      debug=1;
-      unlink(OWL_DEBUG_FILE);
-      argv++;
-      argc--;
-    } else if (!strcmp(argv[0], "-v")) {
+  while((c = getopt_long(argc, argv, "nc:t:s:dDvh",
+                         long_options, NULL)) != -1) {
+    switch(c) {
+    case 'n':
+      opts->load_initial_subs = 0;
+      break;
+    case 'c':
+      opts->configfile = owl_strdup(optarg);
+      break;
+    case 's':
+      opts->confdir = owl_strdup(optarg);
+      break;
+    case 't':
+      opts->tty = owl_strdup(optarg);
+      break;
+    case 'D':
+      opts->rm_debug = 1;
+      /* fallthrough */
+    case 'd':
+      opts->debug = 1;
+      break;
+    case 'v':
       printf("This is barnowl version %s\n", OWL_VERSION_STRING);
       exit(0);
-    } else {
-      fprintf(stderr, "Unknown argument\n");
-      usage();	      
+    case 'h':
+    default:
+      usage();
       exit(1);
     }
   }
+}
 
-  owl_function_debugmsg("startup: Finished parsing arguments");
-
-  /* signal handler */
-  /*sigact.sa_handler=sig_handler;*/
-  sigact.sa_sigaction=sig_handler;
-  sigemptyset(&sigact.sa_mask);
-  sigact.sa_flags=SA_SIGINFO;
-  sigaction(SIGWINCH, &sigact, NULL);
-  sigaction(SIGALRM, &sigact, NULL);
-  sigaction(SIGPIPE, &sigact, NULL);
-  sigaction(SIGTERM, &sigact, NULL);
-  sigaction(SIGHUP, &sigact, NULL);
-
-  sigact.sa_sigaction=sigint_handler;
-  sigaction(SIGINT, &sigact, NULL);
-
-  /* save initial terminal settings */
-  tcgetattr(0, owl_global_get_startup_tio(&g));
-
-  /* turn ISTRIP off */
-  tcgetattr(0, &tio);
-  tio.c_iflag &= ~ISTRIP;
-  tio.c_cc[VQUIT] = 0;
-  tcsetattr(0, TCSAFLUSH, &tio);
-
-  /* screen init */
-  if (!getenv("TERMINFO")) {
-    owl_function_debugmsg("startup: Not setting TERMINFO");
-  } else {
-    owl_function_debugmsg("startup: leaving TERMINFO as %s from envrionment", getenv("TERMINFO"));
-  }
-  initscr();
+void owl_start_color(void) {
   start_color();
 #ifdef HAVE_USE_DEFAULT_COLORS
   use_default_colors();
 #endif
-  cbreak();
-  noecho();
 
   /* define simple color pairs */
   if (has_colors() && COLOR_PAIRS>=8) {
@@ -177,313 +127,59 @@ int main(int argc, char **argv, char **env)
     init_pair(OWL_COLOR_CYAN,    COLOR_CYAN,    bg);
     init_pair(OWL_COLOR_WHITE,   COLOR_WHITE,   bg);
   }
+}
 
-  /* owl global init */
-  owl_global_init(&g);
-  if (debug) owl_global_set_debug_on(&g);
-  if (confdir) owl_global_set_confdir(&g, confdir);
-  owl_function_debugmsg("startup: first available debugging message");
-  owl_global_set_startupargs(&g, argcsave, argvsave);
-  owl_global_set_haveaim(&g);
+void owl_start_curses(void) {
+  struct termios tio;
+  /* save initial terminal settings */
+  tcgetattr(0, owl_global_get_startup_tio(&g));
 
-  /* prepare stdin dispatch */
-  {
-    owl_dispatch *d = owl_malloc(sizeof(owl_dispatch));
-    d->fd = STDIN;
-    d->cfunc = &owl_process_input;
-    d->destroy = NULL;
-    owl_select_add_dispatch(d);
-  }
+  tcgetattr(0, &tio);
+  tio.c_iflag &= ~(ISTRIP|IEXTEN);
+  tio.c_cc[VQUIT] = 0;
+  tio.c_cc[VSUSP] = 0;
+  tcsetattr(0, TCSAFLUSH, &tio);
 
-  owl_zephyr_initialize();
+  /* screen init */
+  initscr();
+  cbreak();
+  noecho();
 
-#if OWL_STDERR_REDIR
-  /* Do this only after we've started curses up... */
-  {
-    owl_dispatch *d = owl_malloc(sizeof(owl_dispatch));
-    owl_function_debugmsg("startup: doing stderr redirection");
-    d->fd = stderr_replace();
-    d->cfunc = stderr_redirect_handler;
-    d->destroy = NULL;
-    owl_select_add_dispatch(d);
-  }
-#endif
+  owl_start_color();
+}
 
-  /* create the owl directory, in case it does not exist */
-  owl_function_debugmsg("startup: creating owl directory, if not present");
-  dir=owl_global_get_confdir(&g);
-  mkdir(dir, S_IRWXU);
-
-  /* set the tty, either from the command line, or by figuring it out */
-  owl_function_debugmsg("startup: setting tty name");
-  if (tty) {
-    owl_global_set_tty(&g, tty);
-  } else {
-    char *tty = owl_util_get_default_tty();
-    owl_global_set_tty(&g, tty);
-    free(tty);
-  }
-
-  /* Initialize perl */
-  owl_function_debugmsg("startup: processing config file");
-  owl_context_set_readconfig(owl_global_get_context(&g));
-  perlerr=owl_perlconfig_initperl(configfile, &argc, &argv, &env);
-  if (perlerr) {
-    endwin();
-    fprintf(stderr, "Internal perl error: %s\n", perlerr);
-    fflush(stderr);
-    printf("Internal perl error: %s\n", perlerr);
-    fflush(stdout);
-    exit(1);
-  }
+static void owl_setup_default_filters(void)
+{
+  int i;
+  static const struct {
+    const char *name;
+    const char *desc;
+  } filters[] = {
+    { "personal",
+      "private ^true$ and ( not type ^zephyr$ or "
+      "( class ^message and ( instance ^personal$ or instance ^urgent$ ) ) )" },
+    { "trash",
+      "class ^mail$ or opcode ^ping$ or type ^admin$ or ( not login ^none$ )" },
+    { "wordwrap", "not ( type ^admin$ or type ^zephyr$ )" },
+    { "ping", "opcode ^ping$" },
+    { "auto", "opcode ^auto$" },
+    { "login", "not login ^none$" },
+    { "reply-lockout", "class ^noc or class ^mail$" },
+    { "out", "direction ^out$" },
+    { "aim", "type ^aim$" },
+    { "zephyr", "type ^zephyr$" },
+    { "none", "false" },
+    { "all", "true" },
+    { NULL, NULL }
+  };
 
   owl_global_complete_setup(&g);
 
-  /* setup the default filters */
-  /* the personal filter will need to change again when AIM chat's are
-   *  included.  Also, there should be an %aimme% */
   owl_function_debugmsg("startup: creating default filters");
-  f=owl_malloc(sizeof(owl_filter));
-  owl_filter_init_fromstring(f, "personal", "private ^true$ and ( not type ^zephyr$"
-                             " or ( class ^message and"
-                             " ( instance ^personal$ or instance ^urgent$ ) ) )");
-  owl_list_append_element(owl_global_get_filterlist(&g), f);
 
-  f=owl_malloc(sizeof(owl_filter));
-  owl_filter_init_fromstring(f, "wordwrap", "not ( type ^admin$ or type ^zephyr$ ) ");
-  owl_list_append_element(owl_global_get_filterlist(&g), f);
-
-  f=owl_malloc(sizeof(owl_filter));
-  owl_filter_init_fromstring(f, "trash", "class ^mail$ or opcode ^ping$ or type ^admin$ or ( not login ^none$ )");
-  owl_list_append_element(owl_global_get_filterlist(&g), f);
-
-  f=owl_malloc(sizeof(owl_filter));
-  owl_filter_init_fromstring(f, "ping", "opcode ^ping$");
-  owl_list_append_element(owl_global_get_filterlist(&g), f);
-
-  f=owl_malloc(sizeof(owl_filter));
-  owl_filter_init_fromstring(f, "auto", "opcode ^auto$");
-  owl_list_append_element(owl_global_get_filterlist(&g), f);
-
-  f=owl_malloc(sizeof(owl_filter));
-  owl_filter_init_fromstring(f, "login", "not login ^none$");
-  owl_list_append_element(owl_global_get_filterlist(&g), f);
-
-  f=owl_malloc(sizeof(owl_filter));
-  owl_filter_init_fromstring(f, "reply-lockout", "class ^noc or class ^mail$");
-  owl_list_append_element(owl_global_get_filterlist(&g), f);
-
-  f=owl_malloc(sizeof(owl_filter));
-  owl_filter_init_fromstring(f, "out", "direction ^out$");
-  owl_list_append_element(owl_global_get_filterlist(&g), f);
-
-  f=owl_malloc(sizeof(owl_filter));
-  owl_filter_init_fromstring(f, "aim", "type ^aim$");
-  owl_list_append_element(owl_global_get_filterlist(&g), f);
-
-  f=owl_malloc(sizeof(owl_filter));
-  owl_filter_init_fromstring(f, "zephyr", "type ^zephyr$");
-  owl_list_append_element(owl_global_get_filterlist(&g), f);
-
-  f=owl_malloc(sizeof(owl_filter));
-  owl_filter_init_fromstring(f, "none", "false");
-  owl_list_append_element(owl_global_get_filterlist(&g), f);
-
-  f=owl_malloc(sizeof(owl_filter));
-  owl_filter_init_fromstring(f, "all", "true");
-  owl_list_append_element(owl_global_get_filterlist(&g), f);
-
-  /* set the current view */
-  owl_function_debugmsg("startup: setting the current view");
-  g.current_view = owl_view_new("all");
-  owl_global_set_current_style(&g, owl_global_get_style_by_name(&g, "default"));
-  owl_function_firstmsg();
-
-  /* AIM init */
-  owl_function_debugmsg("startup: doing AIM initialization");
-  owl_aim_init();
-
-  /* execute the startup function in the configfile */
-  owl_function_debugmsg("startup: executing perl startup, if applicable");
-  perlout = owl_perlconfig_execute("BarnOwl::Hooks::_startup();");
-  if (perlout) owl_free(perlout);
-
-  /* hold on to the window names for convenience */
-  msgwin=owl_global_get_curs_msgwin(&g);
-  recwin=owl_global_get_curs_recwin(&g);
-  sepwin=owl_global_get_curs_sepwin(&g);
-  typwin=owl_global_get_curs_typwin(&g);
-  tw=owl_global_get_typwin(&g);
-
-  /* welcome message */
-  if(owl_messagelist_get_size(owl_global_get_msglist(&g)) == 0) {
-      owl_function_debugmsg("startup: creating splash message");
-      owl_function_adminmsg("",
-        "-----------------------------------------------------------------------\n"
-        "Welcome to barnowl version " OWL_VERSION_STRING ".  Press 'h' for on-line help.\n"
-        "To see a quick introduction, type ':show quickstart'.                  \n"
-        "                                                                       \n"
-        "BarnOwl is free software. Type ':show license' for more                \n"
-        "information.                                                     ^ ^   \n"
-        "                                                                 OvO   \n"
-        "Please report any bugs or suggestions to bug-barnowl@mit.edu    (   )  \n"
-        "-----------------------------------------------------------------m-m---\n"
-        );
-  }
-  sepbar(NULL);
-
-  /* process the startup file */
-  owl_function_debugmsg("startup: processing startup file");
-  owl_function_source(NULL);
-
-  wrefresh(sepwin);
-
-  /* First buddy check to sync the list without notifications */
-  owl_function_debugmsg("startup: doing initial zephyr buddy check");
-  /* owl_function_zephyr_buddy_check(0); */
-
-  /* set the startup and default style, based on userclue and presence of a
-   * formatting function */
-  owl_function_debugmsg("startup: setting startup and default style");
-  if (0 != strcmp(owl_global_get_default_style(&g), "__unspecified__")) {
-    /* the style was set by the user: leave it alone */
-  } else {
-    owl_global_set_default_style(&g, "default");
-  }
-
-  owl_function_debugmsg("startup: set style for the view: %s", owl_global_get_default_style(&g));
-  s = owl_global_get_style_by_name(&g, owl_global_get_default_style(&g));
-  if(s)
-      owl_global_set_current_style(&g, s);
-  else
-      owl_function_error("No such style: %s", owl_global_get_default_style(&g));
-
-  owl_function_debugmsg("startup: setting context interactive");
-  owl_context_set_interactive(owl_global_get_context(&g));
-
-  nexttimediff=10;
-  nexttime=time(NULL);
-
-
-  owl_select_add_timer(180, 180, owl_zephyr_buddycheck_timer, NULL, NULL);
-
-  /* If we ever deprecate the mainloop hook, remove this. */
-  owl_select_add_timer(0, 1, owl_perlconfig_mainloop, NULL, NULL);
-
-
-  owl_function_debugmsg("startup: entering main loop");
-  /* main loop */
-  while (1) {
-
-    owl_perl_savetmps();
-
-    /* if a resize has been scheduled, deal with it */
-    owl_global_resize(&g, 0, 0);
-
-    /* these are here in case a resize changes the windows */
-    msgwin=owl_global_get_curs_msgwin(&g);
-    recwin=owl_global_get_curs_recwin(&g);
-    sepwin=owl_global_get_curs_sepwin(&g);
-    typwin=owl_global_get_curs_typwin(&g);
-
-    followlast=owl_global_should_followlast(&g);
-
-    /* little hack */
-    now=time(NULL);
-    today=localtime(&now);
-    if (today->tm_mon==9 && today->tm_mday==31 && owl_global_get_runtime(&g)<600) {
-      if (time(NULL)>nexttime) {
-	if (nexttimediff==1) {
-	  nexttimediff=10;
-	} else {
-	  nexttimediff=1;
-	}
-	nexttime+=nexttimediff;
-	owl_hack_animate();
-      }
-    }
-
-    /* Grab incoming messages. */
-    newmsgs=0;
-    while(owl_global_messagequeue_pending(&g)) {
-
-      m = owl_global_messagequeue_popmsg(&g);
-
-      if(owl_process_message(m))
-        newmsgs = 1;
-    }
-
-    /* follow the last message if we're supposed to */
-    if (newmsgs && followlast) {
-      owl_function_lastmsg_noredisplay();
-    }
-
-    /* do the newmsgproc thing */
-    if (newmsgs) {
-      owl_function_do_newmsgproc();
-    }
-    
-    /* redisplay if necessary */
-    /* this should be optimized to not run if the new messages won't be displayed */
-    if (newmsgs) {
-      owl_mainwin_redisplay(owl_global_get_mainwin(&g));
-      sepbar(NULL);
-      if (owl_popwin_is_active(owl_global_get_popwin(&g))) {
-	owl_popwin_refresh(owl_global_get_popwin(&g));
-	/* TODO: this is a broken kludge */
-	if (owl_global_get_viewwin(&g)) {
-	  owl_viewwin_redisplay(owl_global_get_viewwin(&g), 0);
-	}
-      }
-      owl_global_set_needrefresh(&g);
-    }
-
-    /* if a popwin just came up, refresh it */
-    pw=owl_global_get_popwin(&g);
-    if (owl_popwin_is_active(pw) && owl_popwin_needs_first_refresh(pw)) {
-      owl_popwin_refresh(pw);
-      owl_popwin_no_needs_first_refresh(pw);
-      owl_global_set_needrefresh(&g);
-      /* TODO: this is a broken kludge */
-      if (owl_global_get_viewwin(&g)) {
-	owl_viewwin_redisplay(owl_global_get_viewwin(&g), 0);
-      }
-    }
-
-    /* update the terminal if we need to */
-    if (owl_global_is_needrefresh(&g)) {
-      /* leave the cursor in the appropriate window */
-      if (owl_global_is_typwin_active(&g)) {
-	owl_function_set_cursor(typwin);
-      } else {
-	owl_function_set_cursor(sepwin);
-      }
-      doupdate();
-      owl_global_set_noneedrefresh(&g);
-    }
-
-    /* Some calls into libzephyr call Z_WaitForNotice(), which has its
-     * own select loop and may leave zephyrs on the queue. Check for
-     * them now, and process any we find. */
-    owl_zephyr_process_events(NULL);
-
-    /* select on FDs we know about. */
-    owl_select();
-
-    /* Log any error signals */
-    {
-      siginfo_t si;
-      int signum;
-      if ((signum = owl_global_get_errsignal_and_clear(&g, &si)) > 0) {
-	owl_function_error("Got unexpected signal: %d %s  (code: %d band: %ld  errno: %d)",
-			   signum, signum==SIGPIPE?"SIGPIPE":"SIG????",
-			   si.si_code, si.si_band, si.si_errno);
-      }
-    }
-
-    owl_perl_freetmps();
-
-  }
+  for (i = 0; filters[i].name != NULL; i++)
+    owl_global_add_filter(&g, owl_filter_new_fromstring(filters[i].name,
+                                                        filters[i].desc));
 }
 
 /*
@@ -498,23 +194,23 @@ int main(int argc, char **argv, char **env)
  * was ignored due to user settings or otherwise.
  */
 int owl_process_message(owl_message *m) {
-  owl_filter *f;
+  const owl_filter *f;
   /* if this message it on the puntlist, nuke it and continue */
   if (owl_global_message_is_puntable(&g, m)) {
-    owl_message_free(m);
+    owl_message_delete(m);
     return 0;
   }
 
   /*  login or logout that should be ignored? */
   if (owl_global_is_ignorelogins(&g)
       && owl_message_is_loginout(m)) {
-    owl_message_free(m);
+    owl_message_delete(m);
     return 0;
   }
 
   if (!owl_global_is_displayoutgoing(&g)
       && owl_message_is_direction_out(m)) {
-    owl_message_free(m);
+    owl_message_delete(m);
     return 0;
   }
 
@@ -580,7 +276,41 @@ int owl_process_message(owl_message *m) {
   return 1;
 }
 
-void owl_process_input(owl_dispatch *d)
+/*
+ * Process any new messages we have waiting in the message queue.
+ * Returns 1 if any messages were added to the message list, and 0 otherwise.
+ */
+int owl_process_messages(owl_ps_action *d, void *p)
+{
+  int newmsgs=0;
+  int followlast = owl_global_should_followlast(&g);
+  owl_message *m;
+
+  /* Grab incoming messages. */
+  while (owl_global_messagequeue_pending(&g)) {
+    m = owl_global_messagequeue_popmsg(&g);
+    if (owl_process_message(m))
+      newmsgs = 1;
+  }
+
+  if (newmsgs) {
+    /* follow the last message if we're supposed to */
+    if (followlast)
+      owl_function_lastmsg_noredisplay();
+
+    /* do the newmsgproc thing */
+    owl_function_do_newmsgproc();
+
+    /* redisplay if necessary */
+    /* this should be optimized to not run if the new messages won't be displayed */
+    owl_mainwin_redisplay(owl_global_get_mainwin(&g));
+    sepbar(NULL);
+    owl_global_set_needrefresh(&g);
+  }
+  return newmsgs;
+}
+
+void owl_process_input(const owl_io_dispatch *d, void *data)
 {
   owl_input j;
   WINDOW *typwin;
@@ -661,18 +391,22 @@ void sigint_handler(int sig, siginfo_t *si, void *data)
   owl_global_set_interrupted(&g);
 }
 
-void usage()
-{
-  fprintf(stderr, "Barnowl version %s\n", OWL_VERSION_STRING);
-  fprintf(stderr, "Usage: barnowl [-n] [-d] [-D] [-v] [-h] [-c <configfile>] [-s <confdir>] [-t <ttyname>]\n");
-  fprintf(stderr, "  -n      don't load zephyr subscriptions\n");
-  fprintf(stderr, "  -d      enable debugging\n");
-  fprintf(stderr, "  -D      enable debugging and delete previous debug file\n");
-  fprintf(stderr, "  -v      print the Barnowl version number and exit\n");
-  fprintf(stderr, "  -h      print this help message\n");
-  fprintf(stderr, "  -c      specify an alternate config file\n");
-  fprintf(stderr, "  -s      specify an alternate config dir (default ~/.owl)\n");
-  fprintf(stderr, "  -t      set the tty name\n");
+void owl_register_signal_handlers(void) {
+  struct sigaction sigact;
+
+  /* signal handler */
+  /*sigact.sa_handler=sig_handler;*/
+  sigact.sa_sigaction=sig_handler;
+  sigemptyset(&sigact.sa_mask);
+  sigact.sa_flags=SA_SIGINFO;
+  sigaction(SIGWINCH, &sigact, NULL);
+  sigaction(SIGALRM, &sigact, NULL);
+  sigaction(SIGPIPE, &sigact, NULL);
+  sigaction(SIGTERM, &sigact, NULL);
+  sigaction(SIGHUP, &sigact, NULL);
+
+  sigact.sa_sigaction=sigint_handler;
+  sigaction(SIGINT, &sigact, NULL);
 }
 
 #if OWL_STDERR_REDIR
@@ -697,7 +431,7 @@ int stderr_replace(void)
 }
 
 /* Sends stderr (read from rfd) messages to the error console */
-void stderr_redirect_handler(owl_dispatch *d)
+void stderr_redirect_handler(const owl_io_dispatch *d, void *data)
 {
   int navail, bread;
   char *buf;
@@ -705,7 +439,7 @@ void stderr_redirect_handler(owl_dispatch *d)
   char *err;
 
   if (rfd<0) return;
-  if (-1 == ioctl(rfd, FIONREAD, (void*)&navail)) {
+  if (-1 == ioctl(rfd, FIONREAD, &navail)) {
     return;
   }
   /*owl_function_debugmsg("stderr_redirect: navail = %d\n", navail);*/
@@ -722,6 +456,7 @@ void stderr_redirect_handler(owl_dispatch *d)
   owl_free(buf);
 
   owl_function_log_err(err);
+  owl_free(err);
 }
 
 #endif /* OWL_STDERR_REDIR */
@@ -731,5 +466,199 @@ void owl_zephyr_buddycheck_timer(owl_timer *t, void *data)
   if (owl_global_is_pseudologins(&g)) {
     owl_function_debugmsg("Doing zephyr buddy check");
     owl_function_zephyr_buddy_check(1);
+  }
+}
+
+
+int main(int argc, char **argv, char **env)
+{
+  WINDOW *sepwin, *typwin;
+  int argcsave;
+  const char *const *argvsave;
+  char *perlout, *perlerr;
+  owl_style *s;
+  const char *dir;
+  owl_options opts;
+
+  if (!GLIB_CHECK_VERSION (2, 12, 0))
+    g_error ("GLib version 2.12.0 or above is needed.");
+
+  argcsave=argc;
+  argvsave=strs(argv);
+
+  setlocale(LC_ALL, "");
+
+  memset(&opts, 0, sizeof opts);
+  opts.load_initial_subs = 1;
+  owl_parse_options(argc, argv, &opts);
+  g.load_initial_subs = opts.load_initial_subs;
+
+  owl_function_debugmsg("startup: Finished parsing arguments");
+
+  owl_register_signal_handlers();
+  owl_start_curses();
+
+  /* owl global init */
+  owl_global_init(&g);
+  if (opts.rm_debug) unlink(OWL_DEBUG_FILE);
+  if (opts.debug) owl_global_set_debug_on(&g);
+  if (opts.confdir) owl_global_set_confdir(&g, opts.confdir);
+  owl_function_debugmsg("startup: first available debugging message");
+  owl_global_set_startupargs(&g, argcsave, argvsave);
+  owl_global_set_haveaim(&g);
+
+  /* register STDIN dispatch; throw away return, we won't need it */
+  owl_select_add_io_dispatch(STDIN, OWL_IO_READ, &owl_process_input, NULL, NULL);
+  owl_zephyr_initialize();
+
+#if OWL_STDERR_REDIR
+  /* Do this only after we've started curses up... */
+  owl_function_debugmsg("startup: doing stderr redirection");
+  owl_select_add_io_dispatch(stderr_replace(), OWL_IO_READ, &stderr_redirect_handler, NULL, NULL);
+#endif
+
+  /* create the owl directory, in case it does not exist */
+  owl_function_debugmsg("startup: creating owl directory, if not present");
+  dir=owl_global_get_confdir(&g);
+  mkdir(dir, S_IRWXU);
+
+  /* set the tty, either from the command line, or by figuring it out */
+  owl_function_debugmsg("startup: setting tty name");
+  if (opts.tty) {
+    owl_global_set_tty(&g, opts.tty);
+  } else {
+    char *tty = owl_util_get_default_tty();
+    owl_global_set_tty(&g, tty);
+    owl_free(tty);
+  }
+
+  /* Initialize perl */
+  owl_function_debugmsg("startup: processing config file");
+
+  owl_global_pop_context(&g);
+  owl_global_push_context(&g, OWL_CTX_READCONFIG, NULL, NULL);
+
+  perlerr=owl_perlconfig_initperl(opts.configfile, &argc, &argv, &env);
+  if (perlerr) {
+    endwin();
+    fprintf(stderr, "Internal perl error: %s\n", perlerr);
+    fflush(stderr);
+    printf("Internal perl error: %s\n", perlerr);
+    fflush(stdout);
+    exit(1);
+  }
+
+  owl_global_complete_setup(&g);
+
+  owl_setup_default_filters();
+
+  /* set the current view */
+  owl_function_debugmsg("startup: setting the current view");
+  g.current_view = owl_view_new("all");
+  owl_global_set_current_style(&g, owl_global_get_style_by_name(&g, "default"));
+  owl_function_firstmsg();
+
+  /* AIM init */
+  owl_function_debugmsg("startup: doing AIM initialization");
+  owl_aim_init();
+
+  /* execute the startup function in the configfile */
+  owl_function_debugmsg("startup: executing perl startup, if applicable");
+  perlout = owl_perlconfig_execute("BarnOwl::Hooks::_startup();");
+  if (perlout) owl_free(perlout);
+
+  /* welcome message */
+  if(owl_messagelist_get_size(owl_global_get_msglist(&g)) == 0) {
+  owl_function_debugmsg("startup: creating splash message");
+  owl_function_adminmsg("",
+    "-----------------------------------------------------------------------\n"
+    "Welcome to barnowl version " OWL_VERSION_STRING ".  Press 'h' for on-line help.\n"
+    "To see a quick introduction, type ':show quickstart'.                  \n"
+    "                                                                       \n"
+    "BarnOwl is free software. Type ':show license' for more                \n"
+    "information.                                                     ^ ^   \n"
+    "                                                                 OvO   \n"
+    "Please report any bugs or suggestions to bug-barnowl@mit.edu    (   )  \n"
+    "-----------------------------------------------------------------m-m---\n"
+  );
+  }
+  sepbar(NULL);
+
+  /* process the startup file */
+  owl_function_debugmsg("startup: processing startup file");
+  owl_function_source(NULL);
+
+  update_panels();
+
+  /* Set the default style */
+  owl_function_debugmsg("startup: setting startup and default style");
+  if (0 != strcmp(owl_global_get_default_style(&g), "__unspecified__")) {
+    /* the style was set by the user: leave it alone */
+  } else {
+    owl_global_set_default_style(&g, "default");
+  }
+
+  owl_function_debugmsg("startup: set style for the view: %s", owl_global_get_default_style(&g));
+  s = owl_global_get_style_by_name(&g, owl_global_get_default_style(&g));
+  if(s)
+      owl_global_set_current_style(&g, s);
+  else
+      owl_function_error("No such style: %s", owl_global_get_default_style(&g));
+
+  owl_function_debugmsg("startup: setting context interactive");
+
+  owl_global_pop_context(&g);
+  owl_global_push_context(&g, OWL_CTX_READCONFIG|OWL_CTX_RECV, NULL, "recv");
+
+  owl_select_add_timer(180, 180, owl_zephyr_buddycheck_timer, NULL, NULL);
+
+  /* If we ever deprecate the mainloop hook, remove this. */
+  owl_select_add_timer(0, 1, owl_perlconfig_mainloop, NULL, NULL);
+
+  owl_select_add_pre_select_action(owl_process_messages, NULL, NULL);
+
+  owl_function_debugmsg("startup: entering main loop");
+  /* main loop */
+  while (1) {
+
+    owl_perl_savetmps();
+
+    /* if a resize has been scheduled, deal with it */
+    owl_global_resize(&g, 0, 0);
+
+    /* these are here in case a resize changes the windows */
+    sepwin=owl_global_get_curs_sepwin(&g);
+    typwin=owl_global_get_curs_typwin(&g);
+
+    /* update the terminal if we need to */
+    if (owl_global_is_needrefresh(&g)) {
+      /* push all changed windows to screen */
+      update_panels();
+      /* leave the cursor in the appropriate window */
+      if (!owl_popwin_is_active(owl_global_get_popwin(&g))
+	  && owl_global_get_typwin(&g)) {
+	owl_function_set_cursor(typwin);
+      } else {
+	owl_function_set_cursor(sepwin);
+      }
+      doupdate();
+      owl_global_set_noneedrefresh(&g);
+    }
+
+    /* select on FDs we know about. */
+    owl_select();
+
+    /* Log any error signals */
+    {
+      siginfo_t si;
+      int signum;
+      if ((signum = owl_global_get_errsignal_and_clear(&g, &si)) > 0) {
+	owl_function_error("Got unexpected signal: %d %s  (code: %d band: %ld  errno: %d)",
+			   signum, signum==SIGPIPE?"SIGPIPE":"SIG????",
+			   si.si_code, si.si_band, si.si_errno);
+      }
+    }
+
+    owl_perl_freetmps();
   }
 }

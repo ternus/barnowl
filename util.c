@@ -4,18 +4,17 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <pwd.h>
+#include <sys/stat.h>
+#include <sys/types.h>
 
-static const char fileIdent[] = "$Id$";
-
-void sepbar(char *in)
+void sepbar(const char *in)
 {
-  char buff[1024];
   WINDOW *sepwin;
-  owl_messagelist *ml;
-  owl_view *v;
+  const owl_messagelist *ml;
+  const owl_view *v;
   owl_view_iterator *iter;
   int x, y;
-  char *foo, *appendtosepbar;
+  const char *foo, *appendtosepbar;
 
   iter = owl_view_iterator_free_later(owl_view_iterator_new());
 
@@ -37,21 +36,19 @@ void sepbar(char *in)
     return;
   }
 
-  wmove(sepwin, 0, 2);  
+  wmove(sepwin, 0, 2);
 
-  if (owl_messagelist_get_size(ml)==0) {
-    strcpy(buff, " (-) ");
-  } else {
-    snprintf(buff, 1024, " (%i) ", owl_messagelist_get_size(ml));
-  }
-  waddstr(sepwin, buff);
+  if (owl_messagelist_get_size(ml) == 0)
+    waddstr(sepwin, " (-) ");
+  else
+    wprintw(sepwin, " (%i) ", owl_messagelist_get_size(ml));
 
   foo=owl_view_get_filtname(v);
-  if (strcmp(foo, owl_global_get_view_home(&g))) wattroff(sepwin, A_REVERSE);
-  waddstr(sepwin, " ");
-  waddstr(sepwin, owl_view_get_filtname(v));
-  waddstr(sepwin, " ");
-  if (strcmp(foo, owl_global_get_view_home(&g))) wattron(sepwin, A_REVERSE);
+  if (strcmp(foo, owl_global_get_view_home(&g)))
+      wattroff(sepwin, A_REVERSE);
+  wprintw(sepwin, " %s ", owl_view_get_filtname(v));
+  if (strcmp(foo, owl_global_get_view_home(&g)))
+      wattron(sepwin, A_REVERSE);
 
   if (owl_mainwin_is_curmsg_truncated(owl_global_get_mainwin(&g))) {
     getyx(sepwin, y, x);
@@ -74,8 +71,7 @@ void sepbar(char *in)
   if (owl_global_get_rightshift(&g)>0) {
     getyx(sepwin, y, x);
     wmove(sepwin, y, x+2);
-    snprintf(buff, 1024, " right: %i ", owl_global_get_rightshift(&g));
-    waddstr(sepwin, buff);
+    wprintw(sepwin, " right: %i ", owl_global_get_rightshift(&g));
   }
 
   if (owl_global_is_zaway(&g) || owl_global_is_aaway(&g)) {
@@ -124,33 +120,30 @@ void sepbar(char *in)
     
   wattroff(sepwin, A_BOLD);
   wattroff(sepwin, A_REVERSE);
-  wnoutrefresh(sepwin);
 }
 
-char **atokenize(char *buffer, char *sep, int *i)
+char **atokenize(const char *buffer, const char *sep, int *i)
 {
   /* each element of return must be freed by user */
   char **args;
   char *workbuff, *foo;
   int done=0, first=1, count=0;
 
-  workbuff=owl_malloc(strlen(buffer)+1);
-  memcpy(workbuff, buffer, strlen(buffer)+1);
+  workbuff = owl_strdup(buffer);
 
   args=NULL;
   while (!done) {
     if (first) {
       first=0;
-      foo=(char *)strtok(workbuff, sep);
+      foo=strtok(workbuff, sep);
     } else {
-      foo=(char *)strtok(NULL, sep);
+      foo=strtok(NULL, sep);
     }
     if (foo==NULL) {
       done=1;
     } else {
-      args=(char **)owl_realloc(args, sizeof(char *) * (count+1));
-      args[count]=owl_malloc(strlen(foo)+1);
-      strcpy(args[count], foo);
+      args=owl_realloc(args, sizeof(char *) * (count+1));
+      args[count] = owl_strdup(foo);
       count++;
     }
   }
@@ -159,16 +152,18 @@ char **atokenize(char *buffer, char *sep, int *i)
   return(args);
 }
 
-char *skiptokens(char *buff, int n) {
-  /* skips n tokens and returns where that would be.
-   * TODO: handle quotes more sanely. */
-  
-  int inquotes=0;
+const char *skiptokens(const char *buff, int n) {
+  /* skips n tokens and returns where that would be. */
+  char quote = 0;
   while (*buff && n>0) {
       while (*buff == ' ') buff++;
-      while (*buff && (inquotes || *buff != ' ')) { 
-	if (*buff == '"' || *buff == '\'') inquotes=!inquotes;
-	buff++;
+      while (*buff && (quote || *buff != ' ')) {
+        if(quote) {
+          if(*buff == quote) quote = 0;
+        } else if(*buff == '"' || *buff == '\'') {
+          quote = *buff;
+        }
+        buff++;
       }
       while (*buff == ' ') buff++;
       n--;
@@ -179,7 +174,7 @@ char *skiptokens(char *buff, int n) {
 /* Return a "nice" version of the path.  Tilde expansion is done, and
  * duplicate slashes are removed.  Caller must free the return.
  */
-char *owl_util_makepath(char *in)
+char *owl_util_makepath(const char *in)
 {
   int i, j, x;
   char *out, user[MAXPATHLEN];
@@ -242,7 +237,7 @@ char *owl_util_makepath(char *in)
   return(out);
 }
 
-void atokenize_free(char **tok, int nels)
+void atokenize_delete(char **tok, int nels)
 {
   int i;
   for (i=0; i<nels; i++) {
@@ -252,7 +247,7 @@ void atokenize_free(char **tok, int nels)
 }
 
 
-void owl_parsefree(char **argv, int argc)
+void owl_parse_delete(char **argv, int argc)
 {
   int i;
 
@@ -264,7 +259,7 @@ void owl_parsefree(char **argv, int argc)
   owl_free(argv);
 }
 
-char **owl_parseline(char *line, int *argc)
+char **owl_parseline(const char *line, int *argc)
 {
   /* break a command line up into argv, argc.  The caller must free
      the returned values.  If there is an error argc will be set to
@@ -325,8 +320,7 @@ char **owl_parseline(char *line, int *argc)
     if (quote=='\0') {
       /* add the argument */
       argv=owl_realloc(argv, sizeof(char *)*((*argc)+1));
-      argv[*argc]=owl_malloc(strlen(curarg)+2);
-      strcpy(argv[*argc], curarg);
+      argv[*argc] = owl_strdup(curarg);
       *argc=*argc+1;
       strcpy(curarg, "");
       between=1;
@@ -342,7 +336,7 @@ char **owl_parseline(char *line, int *argc)
 
   /* check for unbalanced quotes */
   if (quote!='\0') {
-    owl_parsefree(argv, *argc);
+    owl_parse_delete(argv, *argc);
     *argc=-1;
     return(NULL);
   }
@@ -407,58 +401,55 @@ char *owl_sprintf(const char *fmt, ...)
   return ret;
 }
 
+/* These are in order of their value in owl.h */
+static const struct {
+  int number;
+  const char *name;
+} color_map[] = {
+  {OWL_COLOR_INVALID, "invalid"},
+  {OWL_COLOR_DEFAULT, "default"},
+  {OWL_COLOR_BLACK, "black"},
+  {OWL_COLOR_RED, "red"},
+  {OWL_COLOR_GREEN, "green"},
+  {OWL_COLOR_YELLOW,"yellow"},
+  {OWL_COLOR_BLUE, "blue"},
+  {OWL_COLOR_MAGENTA, "magenta"},
+  {OWL_COLOR_CYAN, "cyan"},
+  {OWL_COLOR_WHITE, "white"},
+};
 
 /* Return the owl color associated with the named color.  Return -1
  * if the named color is not available
  */
-int owl_util_string_to_color(char *color)
+int owl_util_string_to_color(const char *color)
 {
-  int c;
-  if (!strcasecmp(color, "black")) {
-    return(OWL_COLOR_BLACK);
-  } else if (!strcasecmp(color, "red")) {
-    return(OWL_COLOR_RED);
-  } else if (!strcasecmp(color, "green")) {
-    return(OWL_COLOR_GREEN);
-  } else if (!strcasecmp(color, "yellow")) {
-    return(OWL_COLOR_YELLOW);
-  } else if (!strcasecmp(color, "blue")) {
-    return(OWL_COLOR_BLUE);
-  } else if (!strcasecmp(color, "magenta")) {
-    return(OWL_COLOR_MAGENTA);
-  } else if (!strcasecmp(color, "cyan")) {
-    return(OWL_COLOR_CYAN);
-  } else if (!strcasecmp(color, "white")) {
-    return(OWL_COLOR_WHITE);
-  } else if (!strcasecmp(color, "default")) {
-    return(OWL_COLOR_DEFAULT);
-  }
-  c = atoi(color);
-  if (c >= -1 && c < COLORS) {
+  int c, i;
+  char *p;
+
+  for (i = 0; i < (sizeof(color_map)/sizeof(color_map[0])); i++)
+    if (strcasecmp(color, color_map[i].name) == 0)
+      return color_map[i].number;
+
+  c = strtol(color, &p, 10);
+  if (p != color && c >= -1 && c < COLORS) {
     return(c);
   }
   return(OWL_COLOR_INVALID);
 }
 
 /* Return a string name of the given owl color */
-char *owl_util_color_to_string(int color)
+const char *owl_util_color_to_string(int color)
 {
-  if (color==OWL_COLOR_BLACK)   return("black");
-  if (color==OWL_COLOR_RED)     return("red");
-  if (color==OWL_COLOR_GREEN)   return("green");
-  if (color==OWL_COLOR_YELLOW)  return("yellow");
-  if (color==OWL_COLOR_BLUE)    return("blue");
-  if (color==OWL_COLOR_MAGENTA) return("magenta");
-  if (color==OWL_COLOR_CYAN)    return("cyan");
-  if (color==OWL_COLOR_WHITE)   return("white");
-  if (color==OWL_COLOR_DEFAULT) return("default");
+  if (color >= OWL_COLOR_INVALID && color <= OWL_COLOR_WHITE)
+    return color_map[color - OWL_COLOR_INVALID].name;
   return("Unknown color");
 }
 
 /* Get the default tty name.  Caller must free the return */
-char *owl_util_get_default_tty()
+char *owl_util_get_default_tty(void)
 {
-  char *out, *tmp;
+  const char *tmp;
+  char *out;
 
   if (getenv("DISPLAY")) {
     out=owl_strdup(getenv("DISPLAY"));
@@ -474,65 +465,10 @@ char *owl_util_get_default_tty()
   return(out);
 }
 
-
-/* Animation hack */
-void owl_hack_animate()
-{
-  owl_messagelist *ml;
-  owl_message *m;
-  owl_fmtext *fm;
-  char *text, *ptr;
-  int place;
-
-  ml=owl_global_get_msglist(&g);
-  m=owl_messagelist_get_by_id(ml, 0);
-  if (!m) return;
-  if (owl_message_get_id(m)!=0) return;
-
-  fm=owl_message_get_fmtext(m);
-  text=owl_fmtext_get_text(fm);
-
-  ptr=strstr(text, "OvO");
-  if (ptr) {
-    place=ptr-text;
-    owl_fmtext_set_char(fm, place, '-');
-    owl_fmtext_set_char(fm, place+2, '-');
-
-    owl_mainwin_redisplay(owl_global_get_mainwin(&g));
-    if (owl_popwin_is_active(owl_global_get_popwin(&g))) {
-      owl_popwin_refresh(owl_global_get_popwin(&g));
-      /* TODO: this is a broken kludge */
-      if (owl_global_get_viewwin(&g)) {
-	owl_viewwin_redisplay(owl_global_get_viewwin(&g), 0);
-      }
-    }
-    owl_global_set_needrefresh(&g);
-    return;
-  }
-
-  ptr=strstr(text, "-v-");
-  if (ptr) {
-    place=ptr-text;
-    owl_fmtext_set_char(fm, place, 'O');
-    owl_fmtext_set_char(fm, place+2, 'O');
-
-    owl_mainwin_redisplay(owl_global_get_mainwin(&g));
-    if (owl_popwin_is_active(owl_global_get_popwin(&g))) {
-      owl_popwin_refresh(owl_global_get_popwin(&g));
-      /* TODO: this is a broken kludge */
-      if (owl_global_get_viewwin(&g)) {
-	owl_viewwin_redisplay(owl_global_get_viewwin(&g), 0);
-      }
-    }
-    owl_global_set_needrefresh(&g);
-    return;
-  }
-}
-
 /* strip leading and trailing new lines.  Caller must free the
  * return.
  */
-char *owl_util_stripnewlines(char *in)
+char *owl_util_stripnewlines(const char *in)
 {
   
   char  *tmp, *ptr1, *ptr2, *out;
@@ -552,82 +488,83 @@ char *owl_util_stripnewlines(char *in)
   return(out);
 }
 
-/* Delete the line matching "line" from the named file.  If no such
- * line is found the file is left intact.  If backup==1 then create a
- * backupfile containing the original contents.  This is an
- * inefficient impelementation which reads the entire file into
- * memory.
+/* Delete all lines matching "line" from the named file.  If no such
+ * line is found the file is left intact.  If backup==1 then leave a
+ * backup file containing the original contents.  The match is
+ * case-insensitive.
+ *
+ * Returns the number of lines removed
  */
-void owl_util_file_deleteline(char *filename, char *line, int backup)
+int owl_util_file_deleteline(const char *filename, const char *line, int backup)
 {
-  char buff[LINE], *text;
-  char *backupfilename="";
-  FILE *file, *backupfile=NULL;
-  int size, newline;
+  char *backupfile, *newfile, *buf = NULL;
+  FILE *old, *new;
+  struct stat st;
+  int numremoved = 0;
 
-  /* open the file for reading */
-  file=fopen(filename, "r");
-  if (!file) {
-    owl_function_error("Error opening file %s", filename);
-    return;
+  if ((old = fopen(filename, "r")) == NULL) {
+    owl_function_error("Cannot open %s (for reading): %s",
+		       filename, strerror(errno));
+    return 0;
   }
 
-  /* open the backup file for writing */
+  if (fstat(fileno(old), &st) != 0) {
+    owl_function_error("Cannot stat %s: %s", filename, strerror(errno));
+    return 0;
+  }
+
+  newfile = owl_sprintf("%s.new", filename);
+  if ((new = fopen(newfile, "w")) == NULL) {
+    owl_function_error("Cannot open %s (for writing): %s",
+		       filename, strerror(errno));
+    free(newfile);
+    fclose(old);
+    return 0;
+  }
+
+  if (fchmod(fileno(new), st.st_mode & 0777) != 0) {
+    owl_function_error("Cannot set permissions on %s: %s",
+		       filename, strerror(errno));
+    unlink(newfile);
+    fclose(new);
+    free(newfile);
+    fclose(old);
+    return 0;
+  }
+
+  while (owl_getline_chomp(&buf, old))
+    if (strcasecmp(buf, line) != 0)
+      fprintf(new, "%s\n", buf);
+    else
+      numremoved++;
+  owl_free(buf);
+
+  fclose(new);
+  fclose(old);
+
   if (backup) {
-    backupfilename=owl_sprintf("%s.backup", filename);
-    backupfile=fopen(backupfilename, "w");
-    if (!backupfile) {
-      owl_function_error("Error opening file %s for writing", backupfilename);
-      owl_free(backupfilename);
-      fclose(file);
-      return;
+    backupfile = owl_sprintf("%s.backup", filename);
+    unlink(backupfile);
+    if (link(filename, backupfile) != 0) {
+      owl_function_error("Cannot link %s: %s", backupfile, strerror(errno));
+      owl_free(backupfile);
+      unlink(newfile);
+      owl_free(newfile);
+      return 0;
     }
+    owl_free(backupfile);
   }
 
-  /* we'll read the entire file into memory, minus the line we don't want and
-   * and at the same time create the backup file if necessary
-   */
-  text=owl_malloc(LINE);
-  strcpy(text, "");
-  size=LINE;
-  while (fgets(buff, LINE, file)!=NULL) {
-    /* strip the newline */
-    newline=0;
-    if (buff[strlen(buff)-1]=='\n') {
-      buff[strlen(buff)-1]='\0';
-      newline=1;
-    }
-    
-    /* if we don't match the line, add to saved text in memory */
-    if (strcasecmp(buff, line)) {
-      size+=LINE;
-      text=owl_realloc(text, size);
-      strcat(text, buff);
-      if (newline) strcat(text, "\n");
-    }
-
-    /* write to backupfile if necessary */
-    if (backup) {
-      fputs(buff, backupfile);
-      if (newline) fputs("\n", backupfile);
-    }
-  }
-  if (backup) fclose(backupfile);
-  fclose(file);
-
-  /* now rewrite the original file from memory */
-  file=fopen(filename, "w");
-  if (!file) {
-    owl_function_error("WARNING: Error opening %s for writing.  Use %s to restore.", filename, backupfilename);
-    owl_function_beep();
-  } else {
-    fputs(text, file);
-    fclose(file);
+  if (rename(newfile, filename) != 0) {
+    owl_function_error("Cannot move %s to %s: %s",
+		       newfile, filename, strerror(errno));
+    numremoved = 0;
   }
 
-  if (backup)
-    owl_free(backupfilename);
-  owl_free(text);
+  unlink(newfile);
+  owl_free(newfile);
+
+  return numremoved;
 }
 
 int owl_util_max(int a, int b)
@@ -646,16 +583,15 @@ int owl_util_min(int a, int b)
    leading `un' or trailing `.d'.
    The caller is responsible for freeing the allocated string.
 */
-char * owl_util_baseclass(char * class)
+char * owl_util_baseclass(const char * class)
 {
   char *start, *end;
 
-  start = class;
-  while(!strncmp(start, "un", 2)) {
-    start += 2;
+  while(!strncmp(class, "un", 2)) {
+    class += 2;
   }
 
-  start = owl_strdup(start);
+  start = owl_strdup(class);
   end = start + strlen(start) - 1;
   while(end > start && *end == 'd' && *(end-1) == '.') {
     end -= 2;
@@ -665,21 +601,29 @@ char * owl_util_baseclass(char * class)
   return start;
 }
 
-char * owl_get_datadir()
+const char * owl_get_datadir(void)
 {
-  char * datadir = getenv("BARNOWL_DATA_DIR");
+  const char * datadir = getenv("BARNOWL_DATA_DIR");
   if(datadir != NULL)
     return datadir;
   return DATADIR;
 }
 
+const char * owl_get_bindir(void)
+{
+  const char * bindir = getenv("BARNOWL_BIN_DIR");
+  if(bindir != NULL)
+    return bindir;
+  return BINDIR;
+}
+
 /* Strips format characters from a valid utf-8 string. Returns the
    empty string if 'in' does not validate. */
-char * owl_strip_format_chars(char *in)
+char * owl_strip_format_chars(const char *in)
 {
   char *r;
   if (g_utf8_validate(in, -1, NULL)) {
-    char *s, *p;
+    const char *s, *p;
     r = owl_malloc(strlen(in)+1);
     r[0] = '\0';
     s = in;
@@ -690,7 +634,7 @@ char * owl_strip_format_chars(char *in)
       if (owl_fmtext_is_format_char(g_utf8_get_char(p))) {
 	strncat(r, s, p-s);
 	p = g_utf8_next_char(p);
-	while (p && owl_fmtext_is_format_char(g_utf8_get_char(p))) {
+	while (owl_fmtext_is_format_char(g_utf8_get_char(p))) {
 	  p = g_utf8_next_char(p);
 	}
 	s = p;
@@ -713,7 +657,7 @@ char * owl_strip_format_chars(char *in)
  * out characters in Unicode Plane 16, as we use that plane internally
  * for formatting.
  */
-char * owl_validate_or_convert(char *in)
+char * owl_validate_or_convert(const char *in)
 {
   if (g_utf8_validate(in, -1, NULL)) {
     return owl_strip_format_chars(in);
@@ -728,7 +672,7 @@ char * owl_validate_or_convert(char *in)
  * Validate 'in' as UTF-8, and either return a copy of it, or an empty
  * string if it is invalid utf-8.
  */
-char * owl_validate_utf8(char *in)
+char * owl_validate_utf8(const char *in)
 {
   char *out;
   if (g_utf8_validate(in, -1, NULL)) {
@@ -760,37 +704,85 @@ int owl_util_can_break_after(gunichar c)
   return 0;
 }
 
-/**************************************************************************/
-/************************* REGRESSION TESTS *******************************/
-/**************************************************************************/
-
-#ifdef OWL_INCLUDE_REG_TESTS
-
-#include "test.h"
-
-int owl_util_regtest(void)
+char *owl_escape_highbit(const char *str)
 {
-  int numfailed=0;
-
-  printf("# BEGIN testing owl_util\n");
-
-  FAIL_UNLESS("owl_util_substitute 1",
-	      !strcmp("foo", owl_text_substitute("foo", "", "Y")));
-  FAIL_UNLESS("owl_text_substitute 2",
-	      !strcmp("fYZYZ", owl_text_substitute("foo", "o", "YZ")));
-  FAIL_UNLESS("owl_text_substitute 3",
-	      !strcmp("foo", owl_text_substitute("fYZYZ", "YZ", "o")));
-  FAIL_UNLESS("owl_text_substitute 4",
-	      !strcmp("/u/foo/meep", owl_text_substitute("~/meep", "~", "/u/foo")));
-
-  FAIL_UNLESS("skiptokens 1", 
-	      !strcmp("bar quux", skiptokens("foo bar quux", 1)));
-  FAIL_UNLESS("skiptokens 2", 
-	      !strcmp("meep", skiptokens("foo 'bar quux' meep", 2)));
-
-  /* if (numfailed) printf("*** WARNING: failures encountered with owl_util\n"); */
-  printf("# END testing owl_util (%d failures)\n", numfailed);
-  return(numfailed);
+  GString *out = g_string_new("");
+  unsigned char c;
+  while((c = (*str++))) {
+    if(c == '\\') {
+      g_string_append(out, "\\\\");
+    } else if(c & 0x80) {
+      g_string_append_printf(out, "\\x%02x", (int)c);
+    } else {
+      g_string_append_c(out, c);
+    }
+  }
+  return g_string_free(out, 0);
 }
 
-#endif /* OWL_INCLUDE_REG_TESTS */
+/* innards of owl_getline{,_chomp} below */
+static int owl_getline_internal(char **s, FILE *fp, int newline)
+{
+  int size = 0;
+  int target = 0;
+  int count = 0;
+  int c;
+
+  while (1) {
+    c = getc(fp);
+    if ((target + 1) > size) {
+      size += BUFSIZ;
+      *s = owl_realloc(*s, size);
+    }
+    if (c == EOF)
+      break;
+    count++;
+    if (c != '\n' || newline)
+	(*s)[target++] = c;
+    if (c == '\n')
+      break;
+  }
+  (*s)[target] = 0;
+
+  return count;
+}
+
+/* Read a line from fp, allocating memory to hold it, returning the number of
+ * byte read.  *s should either be NULL or a pointer to memory allocated with
+ * owl_malloc; it will be owl_realloc'd as appropriate.  The caller must
+ * eventually free it.  (This is roughly the interface of getline in the gnu
+ * libc).
+ *
+ * The final newline will be included if it's there.
+ */
+int owl_getline(char **s, FILE *fp)
+{
+  return owl_getline_internal(s, fp, 1);
+}
+
+/* As above, but omitting the final newline */
+int owl_getline_chomp(char **s, FILE *fp)
+{
+  return owl_getline_internal(s, fp, 0);
+}
+
+/* Read the rest of the input available in fp into a string. */
+char *owl_slurp(FILE *fp)
+{
+  char *buf = NULL;
+  char *p;
+  int size = 0;
+  int count;
+
+  while (1) {
+    buf = owl_realloc(buf, size + BUFSIZ);
+    p = &buf[size];
+    size += BUFSIZ;
+
+    if ((count = fread(p, 1, BUFSIZ, fp)) < BUFSIZ)
+      break;
+  }
+  p[count] = 0;
+
+  return buf;
+}

@@ -3,6 +3,22 @@ use warnings;
 
 package BarnOwl;
 
+use base qw(Exporter);
+our @EXPORT_OK = qw(command getcurmsg getnumcols getidletime
+                    zephyr_getsender zephyr_getrealm zephyr_zwrite
+                    zephyr_stylestrip zephyr_smartstrip_user zephyr_getsubs
+                    queue_message admin_message
+                    start_question start_password start_edit_win
+                    get_data_dir get_config_dir popless_text popless_ztext
+                    error debug
+                    create_style getnumcolors wordwrap
+                    add_dispatch remove_dispatch
+                    add_io_dispatch remove_io_dispatch
+                    new_command
+                    new_variable_int new_variable_bool new_variable_string
+                    quote redisplay);
+our %EXPORT_TAGS = (all => \@EXPORT_OK);
+
 BEGIN {
 # bootstrap in C bindings and glue
     *owl:: = \*BarnOwl::;
@@ -16,9 +32,15 @@ use BarnOwl::Hook;
 use BarnOwl::Hooks;
 use BarnOwl::Message;
 use BarnOwl::Style;
+use BarnOwl::Zephyr;
 use BarnOwl::Timer;
+use BarnOwl::Editwin;
+use BarnOwl::Completion;
+use BarnOwl::Help;
 use BarnOwl::MessageList;
 use BarnOwl::View;
+
+use List::Util qw(max);
 
 =head1 NAME
 
@@ -45,7 +67,6 @@ value, return it as a string, otherwise return undef.
 
 Returns the current message as a C<BarnOwl::Message> subclass, or
 undef if there is no message selected
-
 =head2 getnumcols
 
 Returns the width of the display window BarnOwl is currently using
@@ -143,9 +164,58 @@ Adds a file descriptor to C<BarnOwl>'s internal C<select()>
 loop. C<CALLBACK> will be invoked whenever data is available to be
 read from C<FD>.
 
+C<add_dispatch> has been deprecated in favor of C<add_io_dispatch>,
+and is now a wrapper for it called with C<mode> set to C<'r'>.
+
+=cut
+
+sub add_dispatch {
+    my $fd = shift;
+    my $cb = shift;
+    add_io_dispatch($fd, 'r', $cb);
+}
+
 =head2 remove_dispatch FD
 
 Remove a file descriptor previously registered via C<add_dispatch>
+
+C<remove_dispatch> has been deprecated in favor of
+C<remove_io_dispatch>.
+
+=cut
+
+*remove_dispatch = \&remove_io_dispatch;
+
+=head2 add_io_dispatch FD MODE CB
+
+Adds a file descriptor to C<BarnOwl>'s internal C<select()>
+loop. <MODE> can be 'r', 'w', or 'rw'. C<CALLBACK> will be invoked
+whenever C<FD> becomes ready, as specified by <MODE>.
+
+Only one callback can be registered per FD. If a new callback is
+registered, the old one is removed.
+
+=cut
+
+sub add_io_dispatch {
+    my $fd = shift;
+    my $modeStr = shift;
+    my $cb = shift;
+    my $mode = 0;
+
+    $mode |= 0x1 if ($modeStr =~ /r/i); # Read
+    $mode |= 0x2 if ($modeStr =~ /w/i); # Write
+    if ($mode) {
+        $mode |= 0x4;                  # Exceptional
+        BarnOwl::Internal::add_io_dispatch($fd, $mode, $cb);
+    } else {
+        die("Invalid I/O Dispatch mode: $modeStr");
+    }
+}
+
+=head2 remove_io_dispatch FD
+
+Remove a file descriptor previously registered via C<add_io_dispatch>
 
 =head2 create_style NAME OBJECT
 
@@ -155,6 +225,11 @@ string description of the style, and a and C<format_message> method
 which accepts a C<BarnOwl::Message> object and returns a string that
 is the result of formatting the message for display.
 
+=head2 redisplay
+
+Redraw all of the messages on screen. This is useful if you've just
+changed how a style renders messages.
+
 =cut
 
 # perlconfig.c will set this to the value of the -c command-line
@@ -162,6 +237,7 @@ is the result of formatting the message for display.
 our $configfile;
 
 our @__startup_errors = ();
+our @all_commands;
 
 if(!$configfile && -f $ENV{HOME} . "/.barnowlconf") {
     $configfile = $ENV{HOME} . "/.barnowlconf";
@@ -173,35 +249,6 @@ sub _receive_msg_legacy_wrap {
     my ($m) = @_;
     $m->legacy_populate_global();
     return &BarnOwl::Hooks::_receive_msg($m);
-}
-
-=head2 AUTOLOAD
-
-BarnOwl.pm has a C<AUTOLOAD> method that translates unused names in
-the BarnOwl:: namespace to a call to BarnOwl::command() with that
-command. Underscores are also translated to C<->s, so you can do
-e.g. C<BarnOwl::start_command()> and it will be translated into
-C<start-command>.
-
-So, if you're looking for functionality that you can't find in the
-perl interface, check C<:show commands> or C<commands.c> in the
-BarnOwl source tree -- there's a good chance it exists as a BarnOwl
-command.
-
-=head3 BUGS
-
-There are horrible quoting issues here. The AUTOLOAD simple joins your
-commands with spaces and passes them unmodified to C<::command>
-
-=cut
-
-# make BarnOwl::<command>("foo") be aliases to BarnOwl::command("<command> foo");
-sub AUTOLOAD {
-    our $AUTOLOAD;
-    my $called = $AUTOLOAD;
-    $called =~ s/.*:://;
-    $called =~ s/_/-/g;
-    return &BarnOwl::command("$called ".join(" ",@_));
 }
 
 =head2 new_command NAME FUNC [{ARGS}]
@@ -303,25 +350,223 @@ sub _new_variable {
     $func->($name, $args{default}, $args{summary}, $args{description});
 }
 
-=head2 quote STRING
+=head2 quote LIST
 
-Return a version of STRING fully quoted to survive processing by
-BarnOwl's command parser.
+Quotes each of the strings in LIST and returns a string that will be
+correctly decoded to LIST by the BarnOwl command parser.  For example:
+
+    quote('zwrite', 'andersk', '-m', 'Hello, world!')
+    # returns "zwrite andersk -m 'Hello, world!'"
 
 =cut
 
 sub quote {
-    my $str = shift;
-    return "''" if $str eq '';
-    if ($str !~ /['" ]/) {
-        return "$str";
+    my @quoted;
+    for my $str (@_) {
+        if ($str eq '') {
+            push @quoted, "''";
+        } elsif ($str !~ /['" \n\t]/) {
+            push @quoted, "$str";
+        } elsif ($str !~ /'/) {
+            push @quoted, "'$str'";
+        } else {
+            (my $qstr = $str) =~ s/"/"'"'"/g;
+            push @quoted, '"' . $qstr . '"';
+        }
     }
-    if ($str !~ /'/) {
-        return "'$str'";
-    }
-    $str =~ s/"/"'"'"/g;
-    return '"' . $str . '"';
+    return join(' ', @quoted);
 }
 
+=head2 Modify filters by appending text
+
+=cut
+
+sub register_builtin_commands {
+    # Filter modification
+    BarnOwl::new_command("filterappend",
+                         sub { filter_append_helper('appending', '', @_); },
+                       {
+                           summary => "append '<text>' to filter",
+                           usage => "filterappend <filter> <text>",
+                       });
+
+    BarnOwl::new_command("filterand",
+                         sub { filter_append_helper('and-ing', 'and', @_); },
+                       {
+                           summary => "append 'and <text>' to filter",
+                           usage => "filterand <filter> <text>",
+                       });
+
+    BarnOwl::new_command("filteror",
+                         sub { filter_append_helper('or-ing', 'or', @_); },
+                       {
+                           summary => "append 'or <text>' to filter",
+                           usage => "filteror <filter> <text>",
+                       });
+
+    # Date formatting
+    BarnOwl::new_command("showdate",
+                         sub { BarnOwl::time_format('showdate', '%Y-%m-%d %H:%M'); },
+                       {
+                           summary => "Show date in timestamps for supporting styles.",
+                           usage => "showdate",
+                       });
+
+    BarnOwl::new_command("hidedate",
+                         sub { BarnOwl::time_format('hidedate', '%H:%M'); },
+                       {
+                           summary => "Don't show date in timestamps for supporting styles.",
+                           usage => "hidedate",
+                       });
+
+    BarnOwl::new_command("timeformat",
+                         \&BarnOwl::time_format,
+                       {
+                           summary => "Set the format for timestamps and re-display messages",
+                           usage => "timeformat <format>",
+                       });
+
+    # Receive window scrolling
+    BarnOwl::new_command("recv:shiftleft",
+                        \&BarnOwl::recv_shift_left,
+                        {
+                            summary => "scrolls receive window to the left",
+                            usage => "recv:shiftleft [<amount>]",
+                            description => <<END_DESCR
+By default, scroll left by 10 columns. Passing no arguments or 0 activates this default behavior.
+Otherwise, scroll by the number of columns specified as the argument.
+END_DESCR
+                        });
+
+    BarnOwl::new_command("recv:shiftright",
+                        \&BarnOwl::recv_shift_right,
+                        {
+                            summary => "scrolls receive window to the right",
+                            usage => "recv:shiftright [<amount>]",
+                            description => <<END_DESCR
+By default, scroll right by 10 columns. Passing no arguments or 0 activates this default behavior.
+Otherwise, scroll by the number of columns specified as the argument.
+END_DESCR
+                        });
+
+}
+
+$BarnOwl::Hooks::startup->add("BarnOwl::register_builtin_commands");
+
+=head3 filter_append_helper ACTION SEP FUNC FILTER APPEND_TEXT
+
+Helper to append to filters.
+
+=cut
+
+sub filter_append_helper
+{
+    my $action = shift;
+    my $sep = shift;
+    my $func = shift;
+    my $filter = shift;
+    my @append = @_;
+    my $oldfilter = BarnOwl::getfilter($filter);
+    chomp $oldfilter;
+    my $newfilter = "$oldfilter $sep " . quote(@append);
+    my $msgtext = "To filter " . quote($filter) . " $action\n" . quote(@append) . "\nto get\n$newfilter";
+    if (BarnOwl::getvar('showfilterchange') eq 'on') {
+        BarnOwl::admin_message("Filter", $msgtext);
+    }
+    set_filter($filter, $newfilter);
+    return;
+}
+BarnOwl::new_variable_bool("showfilterchange",
+                           { default => 1,
+                             summary => 'Show modifications to filters by filterappend and friends.'});
+
+sub set_filter
+{
+    my $filtername = shift;
+    my $filtertext = shift;
+    my $cmd = 'filter ' . BarnOwl::quote($filtername) . ' ' . $filtertext;
+    BarnOwl::command($cmd);
+}
+
+=head3 time_format FORMAT
+
+Set the format for displaying times (variable timeformat) and redisplay
+messages.
+
+=cut
+
+my $timeformat = '%H:%M';
+
+sub time_format
+{
+    my $function = shift;
+    my $format = shift;
+    if(!$format)
+    {
+        return $timeformat;
+    }
+    if(shift)
+    {
+        return "Wrong number of arguments for command";
+    }
+    $timeformat = $format;
+    redisplay();
+}
+
+=head3 Receive window scrolling
+
+Permit scrolling the receive window left or right by arbitrary
+amounts (with a default of 10 characters).
+
+=cut
+
+sub recv_shift_left
+{
+    my $func = shift;
+    my $delta = shift;
+    $delta = 10 unless defined($delta) && int($delta) > 0;
+    my $shift = BarnOwl::recv_getshift();
+    if($shift > 0) {
+        BarnOwl::recv_setshift(max(0, $shift-$delta));
+    } else {
+        return "Already full left";
+    }
+}
+
+sub recv_shift_right
+{
+    my $func = shift;
+    my $delta = shift;
+    $delta = 10 unless int($delta) > 0;
+    my $shift = BarnOwl::recv_getshift();
+    BarnOwl::recv_setshift($shift+$delta);
+}
+
+=head3 default_zephyr_signature
+
+Compute the default zephyr signature.
+
+=cut
+
+sub default_zephyr_signature
+{
+  my $zsig = getvar('zsig');
+  if (!$zsig) {
+      if (my $zsigproc = getvar('zsigproc')) {
+	  $zsig = `$zsigproc`;
+      } elsif (!defined($zsig = get_zephyr_variable('zwrite-signature'))) {
+	  $zsig = ((getpwuid($<))[6]);
+	  $zsig =~ s/,.*//;
+      }
+  }
+  chomp($zsig);
+  return $zsig;
+}
+
+# Stub for owl::startup / BarnOwl::startup, so it isn't bound to the
+# startup command. This may be redefined in a user's configfile.
+sub startup
+{
+}
 
 1;

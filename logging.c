@@ -4,13 +4,11 @@
 #include <ctype.h>
 #include <sys/param.h>
 
-static const char fileIdent[] = "$Id$";
-
 /* This is now the one function that should be called to log a
  * message.  It will do all the work necessary by calling the other
  * functions in this file as necessary.
  */
-void owl_log_message(owl_message *m) {
+void owl_log_message(const owl_message *m) {
   owl_function_debugmsg("owl_log_message: entering");
 
   if (m == NULL) {
@@ -38,8 +36,8 @@ void owl_log_message(owl_message *m) {
 }
 
 /* Return 1 if we should log the given message, otherwise return 0 */
-int owl_log_shouldlog_message(owl_message *m) {
-  owl_filter *f;
+int owl_log_shouldlog_message(const owl_message *m) {
+  const owl_filter *f;
 
   /* If there's a logfilter and this message matches it, log */
   f=owl_global_get_filter(&g, owl_global_get_logfilter(&g));
@@ -71,7 +69,7 @@ int owl_log_shouldlog_message(owl_message *m) {
   return(1);
 }
 
-void owl_log_zephyr(owl_message *m, FILE *file) {
+void owl_log_zephyr(const owl_message *m, FILE *file) {
     char *tmp;
     tmp=short_zuser(owl_message_get_sender(m));
     fprintf(file, "Class: %s Instance: %s", owl_message_get_class(m), owl_message_get_instance(m));
@@ -83,7 +81,7 @@ void owl_log_zephyr(owl_message *m, FILE *file) {
     owl_free(tmp);
 }
 
-void owl_log_aim(owl_message *m, FILE *file) {
+void owl_log_aim(const owl_message *m, FILE *file) {
     fprintf(file, "From: <%s> To: <%s>\n", owl_message_get_sender(m), owl_message_get_recipient(m));
     fprintf(file, "Time: %s\n\n", owl_message_get_timestr(m));
     if (owl_message_is_login(m))
@@ -94,19 +92,19 @@ void owl_log_aim(owl_message *m, FILE *file) {
         fprintf(file, "%s\n\n", owl_message_get_body(m));
 }
 
-void owl_log_jabber(owl_message *m, FILE *file) {
+void owl_log_jabber(const owl_message *m, FILE *file) {
     fprintf(file, "From: <%s> To: <%s>\n",owl_message_get_sender(m), owl_message_get_recipient(m));
     fprintf(file, "Time: %s\n\n", owl_message_get_timestr(m));
     fprintf(file, "%s\n\n",owl_message_get_body(m));
 }
 
-void owl_log_generic(owl_message *m, FILE *file) {
+void owl_log_generic(const owl_message *m, FILE *file) {
     fprintf(file, "From: <%s> To: <%s>\n", owl_message_get_sender(m), owl_message_get_recipient(m));
     fprintf(file, "Time: %s\n\n", owl_message_get_timestr(m));
     fprintf(file, "%s\n\n", owl_message_get_body(m));
 }
 
-void owl_log_append(owl_message *m, char *filename) {
+void owl_log_append(const owl_message *m, const char *filename) {
     FILE *file;
     file=fopen(filename, "a");
     if (!file) {
@@ -125,7 +123,7 @@ void owl_log_append(owl_message *m, char *filename) {
     fclose(file);
 }
 
-void owl_log_outgoing(owl_message *m)
+void owl_log_outgoing(const owl_message *m)
 {
   char filename[MAXPATHLEN], *logpath;
   char *to, *temp;
@@ -172,27 +170,26 @@ void owl_log_outgoing(owl_message *m)
 }
 
 
-void owl_log_outgoing_zephyr_error(char *to, char *text)
+void owl_log_outgoing_zephyr_error(const owl_zwrite *zw, const char *text)
 {
   FILE *file;
   char filename[MAXPATHLEN], *logpath;
-  char *tobuff, *zwriteline;
+  char *tobuff;
   owl_message *m;
 
   /* create a present message so we can pass it to
-   * owl_log_shouldlog_message()
+   * owl_log_shouldlog_message(void)
    */
-  zwriteline=owl_sprintf("zwrite %s", to);
-  m=owl_function_make_outgoing_zephyr(text, zwriteline, "");
-  owl_free(zwriteline);
+  m = owl_malloc(sizeof(owl_message));
+  owl_message_create_from_zwrite(m, zw, text);
   if (!owl_log_shouldlog_message(m)) {
-    owl_message_free(m);
+    owl_message_delete(m);
     return;
   }
-  owl_message_free(m);
+  owl_message_delete(m);
 
   /* chop off a local realm */
-  tobuff=short_zuser(to);
+  tobuff = short_zuser(owl_list_get_element(&(zw->recips), 0));
 
   /* expand ~ in path names */
   logpath = owl_text_substitute(owl_global_get_logpath(&g), "~", owl_global_get_homedir(&g));
@@ -228,10 +225,11 @@ void owl_log_outgoing_zephyr_error(char *to, char *text)
   owl_free(tobuff);
 }
 
-void owl_log_incoming(owl_message *m)
+void owl_log_incoming(const owl_message *m)
 {
   char filename[MAXPATHLEN], allfilename[MAXPATHLEN], *logpath;
-  char *frombuff=NULL, *from=NULL;
+  const char *from=NULL;
+  char *frombuff=NULL;
   int len, ch, i, personal;
 
   /* figure out if it's a "personal" message or not */
@@ -243,7 +241,7 @@ void owl_log_incoming(owl_message *m)
     }
   } else if (owl_message_is_type_jabber(m)) {
     /* This needs to be fixed to handle groupchat */
-    char* msgtype = owl_message_get_attribute_value(m,"jtype");
+    const char* msgtype = owl_message_get_attribute_value(m,"jtype");
     if (msgtype && !strcmp(msgtype,"groupchat")) {
       personal = 0;
     } else {

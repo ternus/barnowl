@@ -2,11 +2,9 @@
 #define OWL_PERL
 #include "owl.h"
 
-static const char fileIdent[] = "$Id$";
-
-owl_view* owl_view_new(char *filtname)
+owl_view* owl_view_new(const char *filtname)
 {
-  char *args[] = {filtname};
+  const char *args[] = {filtname};
   return owl_perl_new_argv("BarnOwl::View", args, 1);
 }
 
@@ -16,7 +14,7 @@ owl_filter * owl_view_get_filter(owl_view *v)
 }
 
 /* if the message matches the filter then add to view */
-void owl_view_consider_message(owl_view *v, owl_message *m)
+void owl_view_consider_message(owl_view *v, const owl_message *m)
 {
   OWL_PERL_CALL_METHOD(v, "consider_message",
                        XPUSHs((SV*)m);,
@@ -25,7 +23,7 @@ void owl_view_consider_message(owl_view *v, owl_message *m)
                        OWL_PERL_VOID_CALL);
 }
 
-void owl_view_new_filter(owl_view *v, char *filtname)
+void owl_view_new_filter(owl_view *v, const char *filtname)
 {
   OWL_PERL_CALL_METHOD(v, "new_filter",
                        mXPUSHp(filtname, strlen(filtname));,
@@ -34,10 +32,10 @@ void owl_view_new_filter(owl_view *v, char *filtname)
                        OWL_PERL_VOID_CALL);
 }
 
-int owl_view_is_empty(owl_view *v)
+int owl_view_is_empty(const owl_view *v)
 {
   int empty;
-  OWL_PERL_CALL_METHOD(v, "is_empty",
+  OWL_PERL_CALL_METHOD(ro_sv(v), "is_empty",
                        /* no args */,
                        "Error: is_empty: %s",
                        /* fatal */ 1,
@@ -49,21 +47,35 @@ int owl_view_is_empty(owl_view *v)
  * be restored later if we switch back to this filter. */
 void owl_view_save_curmsgid(owl_view *v, int curid)
 {
-  owl_filter_set_cachedmsgid(owl_view_get_filter(v), curid);
+  OWL_PERL_CALL_METHOD(v, "set_saved_id",
+                       mXPUSHi(curid);,
+                       "Error: set_saved_id: %s",
+                       1 /* fatal errors */,
+                       OWL_PERL_VOID_CALL);
+}
+
+int owl_view_get_saved_msgid(const owl_view *v) {
+  int id;
+  OWL_PERL_CALL_METHOD(ro_sv(v), "saved_id",
+                       /* no args */,
+                       "Error: saved_id: %s",
+                       /* fatal */ 1,
+                       id = POPi);
+  return id;
 }
 
 /* fmtext should already be initialized */
-void owl_view_to_fmtext(owl_view *v, owl_fmtext *fm)
+void owl_view_to_fmtext(const owl_view *v, owl_fmtext *fm)
 {
   owl_fmtext_append_normal(fm, "Filter: ");
   owl_fmtext_append_normal(fm, owl_view_get_filtname(v));
   owl_fmtext_append_normal(fm, "\n");
 }
 
-char *owl_view_get_filtname(owl_view *v)
+const char *owl_view_get_filtname(const owl_view *v)
 {
   SV *name;
-  OWL_PERL_CALL_METHOD(v, "get_filter",
+  OWL_PERL_CALL_METHOD(ro_sv(v), "get_filter",
                        /* no args */,
                        "Error: get_filter: %s",
                        1 /* fatal errors */,
@@ -116,7 +128,7 @@ void owl_view_free(owl_view *v)
                        /* fatal */ 1,                   \
                        OWL_PERL_VOID_CALL);             \
 
-owl_view_iterator * owl_view_iterator_new()
+owl_view_iterator * owl_view_iterator_new(void)
 {
   return owl_perl_new("BarnOwl::View::Iterator");
 }
@@ -131,11 +143,11 @@ int owl_view_iterator_is_valid(owl_view_iterator *it)
   CALL_BOOL(it, "valid");
 }
 
-void owl_view_iterator_init_id(owl_view_iterator *it, owl_view *v, int message_id)
+void owl_view_iterator_init_id(owl_view_iterator *it, const owl_view *v, int message_id)
 {
   OWL_PERL_CALL_METHOD(it, "initialize_at_id",
                        /* args */
-                       XPUSHs(v);
+                       XPUSHs(ro_sv(v));
                        mXPUSHi(message_id);,
                        "Error: initialize at id: %s",
                        /* fatal */ 1,
@@ -143,22 +155,22 @@ void owl_view_iterator_init_id(owl_view_iterator *it, owl_view *v, int message_i
 }
 
 /* Initialized iterator to point at the first message */
-void owl_view_iterator_init_start(owl_view_iterator *it, owl_view *v)
+void owl_view_iterator_init_start(owl_view_iterator *it, const owl_view *v)
 {
   OWL_PERL_CALL_METHOD(it, "initialize_at_start",
                        /* args */
-                       XPUSHs(v);,
+                       XPUSHs(ro_sv(v));,
                        "Error: initialize at start: %s",
                        /* fatal */ 1,
                        OWL_PERL_VOID_CALL);
 }
 
 /* Initialized iterator to point after the last message */
-void owl_view_iterator_init_end(owl_view_iterator *it, owl_view *v)
+void owl_view_iterator_init_end(owl_view_iterator *it, const owl_view *v)
 {
   OWL_PERL_CALL_METHOD(it, "initialize_at_end",
                        /* args */
-                       XPUSHs(v);,
+                       XPUSHs(ro_sv(v));,
                        "Error: initialize at end: %s",
                        /* fatal */ 1,
                        OWL_PERL_VOID_CALL);
@@ -226,3 +238,4 @@ owl_view_iterator* owl_view_iterator_free_later(owl_view_iterator *it)
 {
   return sv_2mortal(it);
 }
+

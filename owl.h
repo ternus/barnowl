@@ -1,4 +1,4 @@
-/*  Copyright (c) 2006-2009 The BarnOwl Developers. All rights reserved.
+/*  Copyright (c) 2006-2010 The BarnOwl Developers. All rights reserved.
  *  Copyright (c) 2004 James Kretchmar. All rights reserved.
  *
  *  This program is free software. You can redistribute it and/or
@@ -9,8 +9,21 @@
 #ifndef INC_OWL_H
 #define INC_OWL_H
 
+#ifdef HAVE_STDBOOL_H
+#include <stdbool.h>
+#else
+#ifndef HAVE__BOOL
+#define _Bool signed char
+#endif
+#define bool _Bool
+#define false 0
+#define true 1
+#define __bool_true_false_are_defined 1
+#endif  /* HAVE_STDBOOL_H */
+
 #ifndef OWL_PERL
 #include <curses.h>
+#include <panel.h>
 #endif
 #include <sys/param.h>
 #include <EXTERN.h>
@@ -33,9 +46,9 @@
 /* Perl and curses don't play nice. */
 #ifdef OWL_PERL
 typedef void WINDOW;
+typedef void PANEL;
 /* logout is defined in FreeBSD. */
 #define logout logout_
-/* aim.h defines bool */
 #define HAS_BOOL
 #include <perl.h>
 #include "owl_perl.h"
@@ -43,15 +56,16 @@ typedef void WINDOW;
 #include "XSUB.h"
 #else
 typedef void SV;
+typedef void AV;
+typedef void HV;
 #endif
 
-static const char owl_h_fileIdent[] = "$Id$";
-
-#define BARNOWL_STRINGIFY(x) _STRINGIFY(x)
-#define _STRINGIFY(x) #x
-
-#ifndef OWL_VERSION_STRING
-#define OWL_VERSION_STRING "1.1.2"
+#ifdef  GIT_VERSION
+#define stringify(x)       __stringify(x)
+#define __stringify(x)     #x
+#define OWL_VERSION_STRING stringify(GIT_VERSION)
+#else
+#define OWL_VERSION_STRING PACKAGE_VERSION
 #endif
 
 /* Feature that is being tested to redirect stderr through a pipe. 
@@ -111,9 +125,9 @@ static const char owl_h_fileIdent[] = "$Id$";
 #define OWL_MESSAGE_DIRECTION_IN    "in"
 #define OWL_MESSAGE_DIRECTION_OUT   "out"
 
-#define OWL_MUX_READ   1
-#define OWL_MUX_WRITE  2
-#define OWL_MUX_EXCEPT 4
+#define OWL_IO_READ   1
+#define OWL_IO_WRITE  2
+#define OWL_IO_EXCEPT 4
 
 #define OWL_DIRECTION_NONE      0
 #define OWL_DIRECTION_DOWNWARDS 1
@@ -180,8 +194,6 @@ static const char owl_h_fileIdent[] = "$Id$";
 #define OWL_DEFAULT_ZAWAYMSG    "I'm sorry, but I am currently away from the terminal and am\nnot able to receive your message.\n"
 #define OWL_DEFAULT_AAWAYMSG    "I'm sorry, but I am currently away from the terminal and am\nnot able to receive your message.\n"
 
-#define OWL_INCLUDE_REG_TESTS   1  /* whether to build in regression tests */
-
 #define OWL_CMD_ALIAS_SUMMARY_PREFIX "command alias to: "
 
 #define OWL_WEBZEPHYR_PRINCIPAL "daemon.webzephyr"
@@ -203,6 +215,25 @@ static const char owl_h_fileIdent[] = "$Id$";
 
 #define LINE 2048
 
+#ifdef HAVE_LIBZEPHYR
+/* libzephyr doesn't use const, so we appease the type system with this kludge.
+ * This just casts const char * to char * in a way that doesn't yield a warning
+ * from gcc -Wcast-qual. */
+static inline char *zstr(const char *str)
+{
+  union { char *rw; const char *ro; } u;
+  u.ro = str;
+  return u.rw;
+}
+#endif
+
+/* Convert char *const * into const char *const *.  This conversion is safe,
+ * and implicit in C++ (conv.qual 4) but for some reason not in C. */
+static inline const char *const *strs(char *const *pstr)
+{
+  return (const char *const *)pstr;
+}
+
 typedef struct _owl_variable {
   char *name;
   int   type;  /* OWL_VARIABLE_* */
@@ -212,29 +243,29 @@ typedef struct _owl_variable {
   char *summary;		/* summary of usage */
   char *description;		/* detailed description */
   void *val;                    /* current value */
-  int  (*validate_fn)(struct _owl_variable *v, void *newval);
+  int  (*validate_fn)(const struct _owl_variable *v, const void *newval);
                                 /* returns 1 if newval is valid */
-  int  (*set_fn)(struct _owl_variable *v, void *newval); 
+  int  (*set_fn)(struct _owl_variable *v, const void *newval); 
                                 /* sets the variable to a value
 				 * of the appropriate type.
 				 * unless documented, this 
 				 * should make a copy. 
 				 * returns 0 on success. */
-  int  (*set_fromstring_fn)(struct _owl_variable *v, char *newval);
+  int  (*set_fromstring_fn)(struct _owl_variable *v, const char *newval);
                                 /* sets the variable to a value
 				 * of the appropriate type.
 				 * unless documented, this 
 				 * should make a copy. 
 				 * returns 0 on success. */
-  void *(*get_fn)(struct _owl_variable *v);
+  const void *(*get_fn)(const struct _owl_variable *v);
 				/* returns a reference to the current value.
 				 * WARNING:  this approach is hard to make
 				 * thread-safe... */
-  int  (*get_tostring_fn)(struct _owl_variable *v, 
-			  char *buf, int bufsize, void *val); 
+  int  (*get_tostring_fn)(const struct _owl_variable *v, 
+			  char *buf, int bufsize, const void *val); 
                                 /* converts val to a string 
 				 * and puts into buf */
-  void  (*free_fn)(struct _owl_variable *v);
+  void (*delete_fn)(struct _owl_variable *v);
 				/* frees val as needed */
 } owl_variable;
 
@@ -275,6 +306,7 @@ typedef owl_dict owl_cmddict;	/* dict of commands */
 typedef struct _owl_context {
   int   mode;
   void *data;		/* determined by mode */
+  char *keymap;
 } owl_context;
 
 typedef struct _owl_cmd {	/* command */
@@ -294,14 +326,14 @@ typedef struct _owl_cmd {	/* command */
   char *cmd_aliased_to;		/* what this command is aliased to... */
   
   /* These don't take any context */
-  char *(*cmd_args_fn)(int argc, char **argv, char *buff);  
+  char *(*cmd_args_fn)(int argc, const char *const *argv, const char *buff);  
 				/* takes argv and the full command as buff.
 				 * caller must free return value if !NULL */
   void (*cmd_v_fn)(void);	/* takes no args */
   void (*cmd_i_fn)(int i);	/* takes an int as an arg */
 
   /* The following also take the active context if it's valid */
-  char *(*cmd_ctxargs_fn)(void *ctx, int argc, char **argv, char *buff);  
+  char *(*cmd_ctxargs_fn)(void *ctx, int argc, const char *const *argv, const char *buff);  
 				/* takes argv and the full command as buff.
 				 * caller must free return value if !NULL */
   void (*cmd_ctxv_fn)(void *ctx);	        /* takes no args */
@@ -311,6 +343,7 @@ typedef struct _owl_cmd {	/* command */
 
 
 typedef struct _owl_zwrite {
+  char *zwriteline;
   char *class;
   char *inst;
   char *realm;
@@ -323,7 +356,7 @@ typedef struct _owl_zwrite {
 } owl_zwrite;
 
 typedef struct _owl_pair {
-  char *key;
+  const char *key;
   char *value;
 } owl_pair;
 
@@ -357,12 +390,11 @@ typedef struct _owl_viewwin {
 } owl_viewwin;
   
 typedef struct _owl_popwin {
-  WINDOW *borderwin;
-  WINDOW *popwin;
+  PANEL *borderpanel;
+  PANEL *poppanel;
   int lines;
   int cols;
   int active;
-  int needsfirstrefresh;
 } owl_popwin;
 
 typedef SV owl_messagelist;
@@ -374,9 +406,9 @@ typedef struct _owl_regex {
 } owl_regex;
 
 typedef struct _owl_filterelement {
-  int (*match_message)(struct _owl_filterelement *fe, owl_message *m);
+  int (*match_message)(const struct _owl_filterelement *fe, const owl_message *m);
   /* Append a string representation of the filterelement onto buf*/
-  void (*print_elt)(struct _owl_filterelement *fe, GString *buf);
+  void (*print_elt)(const struct _owl_filterelement *fe, GString *buf);
   /* Operands for and,or,not*/
   struct _owl_filterelement *left, *right;
   /* For regex filters*/
@@ -390,19 +422,7 @@ typedef struct _owl_filter {
   owl_filterelement * root;
   int fgcolor;
   int bgcolor;
-  int cachedmsgid;  /* cached msgid: should move into view eventually */
 } owl_filter;
-
-/* typedef struct _owl_view {
-  char *name;
-  char *filtname;
-  owl_list messages;
-} owl_view;
-
-typedef struct _owl_view_iterator {
-  owl_view *view;
-  int index;
-  } owl_view_iterator; */
 
 typedef SV owl_view;
 typedef SV owl_view_iterator;
@@ -421,24 +441,8 @@ typedef struct _owl_history {
   int repeats;
 } owl_history;
 
-typedef struct _owl_editwin {
-  char *buff;
-  owl_history *hist;
-  int bufflen;
-  int allocated;
-  int buffx, buffy;
-  int topline;
-  int winlines, wincols, fillcol, wrapcol;
-  WINDOW *curswin;
-  int style;
-  int lock;
-  int dotsend;
-  int echochar;
-
-  char *command;
-  void (*callback)(struct _owl_editwin*);
-  void *cbdata;
-} owl_editwin;
+typedef struct _owl_editwin owl_editwin;
+typedef struct _owl_editwin_excursion owl_editwin_excursion;
 
 typedef struct _owl_keybinding {
   int  *keys;			/* keypress stack */
@@ -453,7 +457,7 @@ typedef struct _owl_keymap {
   char     *name;		/* name of keymap */
   char     *desc;		/* description */
   owl_list  bindings;		/* key bindings */
-  struct _owl_keymap *submap;	/* submap */
+  const struct _owl_keymap *submap;	/* submap */
   void (*default_fn)(owl_input j);	/* default action (takes a keypress) */
   void (*prealways_fn)(owl_input  j);	/* always called before a keypress is received */
   void (*postalways_fn)(owl_input  j);	/* always called after keypress is processed */
@@ -461,7 +465,7 @@ typedef struct _owl_keymap {
 
 typedef struct _owl_keyhandler {
   owl_dict  keymaps;		/* dictionary of keymaps */
-  owl_keymap *active;		/* currently active keymap */
+  const owl_keymap *active;		/* currently active keymap */
   int	    in_esc;		/* escape pressed? */
   int       kpstack[OWL_KEYMAP_MAXSTACK+1]; /* current stack of keypresses */
   int       kpstackpos;		/* location in stack (-1 = none) */
@@ -503,20 +507,28 @@ typedef struct _owl_obarray {
   owl_list strings;
 } owl_obarray;
 
-typedef struct _owl_dispatch {
-  int fd;                                 /* FD to watch for dispatch. */
+typedef struct _owl_io_dispatch {
+  int fd;                                     /* FD to watch for dispatch. */
+  int mode;
   int needs_gc;
-  void (*cfunc)(struct _owl_dispatch*);   /* C function to dispatch to. */
-  void (*destroy)(struct _owl_dispatch*); /* Destructor */
+  void (*callback)(const struct _owl_io_dispatch *, void *); /* C function to dispatch to. */
+  void (*destroy)(const struct _owl_io_dispatch *);  /* Destructor */
   void *data;
-} owl_dispatch;
+} owl_io_dispatch;
+
+typedef struct _owl_ps_action {
+  int needs_gc;
+  int (*callback)(struct _owl_ps_action *, void *);
+  void (*destroy)(struct _owl_ps_action *);
+  void *data;
+} owl_ps_action;
 
 typedef struct _owl_popexec {
   int refcount;
   owl_viewwin *vwin;
   int winactive;
-  int pid;			/* or 0 if it has terminated */
-  owl_dispatch dispatch;
+  pid_t pid;			/* or 0 if it has terminated */
+  const owl_io_dispatch *dispatch;
 } owl_popexec;
 
 typedef struct _owl_global {
@@ -525,11 +537,12 @@ typedef struct _owl_global {
   owl_history cmdhist;		/* command history */
   owl_history msghist;		/* outgoing message history */
   owl_keyhandler kh;
-  owl_list filterlist;
+  owl_dict filters;
+  GList *filterlist;
   owl_list puntlist;
   owl_vardict vars;
   owl_cmddict cmds;
-  owl_context ctx;
+  GList *context_stack;
   owl_errqueue errqueue;
   int lines, cols;
   owl_view_iterator *curmsg, *topmsg;
@@ -538,12 +551,11 @@ typedef struct _owl_global {
   owl_view *current_view;
   owl_style *current_style;
   owl_messagelist *msglist;
-  WINDOW *recwin, *sepwin, *msgwin, *typwin;
+  PANEL *recpan, *seppan, *msgpan, *typpan;
   int needrefresh;
   int rightshift;
-  int resizepending;
+  volatile sig_atomic_t resizepending;
   int recwinlines;
-  int typwinactive;
   char *thishost;
   char *homedir;
   char *confdir;
@@ -554,7 +566,7 @@ typedef struct _owl_global {
   int haveconfig;
   int config_format;
   void *buffercbdata;
-  owl_editwin tw;
+  owl_editwin *tw;
   owl_viewwin vw;
   void *perl;
   int debug;
@@ -566,10 +578,9 @@ typedef struct _owl_global {
   int hascolors;
   int colorpairs;
   owl_colorpair_mgr cpmgr;
-  int searchactive;
-  int newmsgproc_pid;
+  pid_t newmsgproc_pid;
   int malloced, freed;
-  char *searchstring;
+  owl_regex search_re;
   aim_session_t aimsess;
   aim_conn_t bosconn;
   owl_timer aim_noop_timer;
@@ -585,17 +596,20 @@ typedef struct _owl_global {
   int havezephyr;
   int haveaim;
   int ignoreaimlogin;
-  int got_err_signal;	    /* 1 if we got an unexpected signal */
-  siginfo_t err_signal_info;
+  volatile sig_atomic_t got_err_signal; /* 1 if we got an unexpected signal */
+  volatile siginfo_t err_signal_info;
   owl_zbuddylist zbuddies;
   owl_timer zephyr_buddycheck_timer;
+  GList *zaldlist;
+  int pseudologin_notify;
   struct termios startup_tio;
   owl_obarray obarray;
-  owl_list dispatchlist;
+  owl_list io_dispatch_list;
+  owl_list psa_list;
   GList *timerlist;
   owl_timer *aim_nop_timer;
   int load_initial_subs;
-  int interrupted;
+  volatile sig_atomic_t interrupted;
   int fmtext_seq;          /* Used to invalidate message fmtext caches */
 } owl_global;
 

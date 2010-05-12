@@ -1,12 +1,10 @@
 #include "owl.h"
 #include <string.h>
 
-static const char fileIdent[] = "$Id$";
-
-void owl_help()
+void owl_help(void)
 {
   owl_fmtext fm;
-  char *varname;
+  const char *varname;
   owl_list varnames;
   int i, numvarnames;
 
@@ -57,7 +55,7 @@ void owl_help()
      "    C-r           Reply but allow editing of reply line\n"
      "\n"
      "    M-n           View zephyrs in selected conversation\n"
-     "    M-N           View zephyrs in selected converstaion of instance\n"
+     "    M-N           View zephyrs in selected conversation of instance\n"
      "    M-p           View only personal zephyrs\n"
      "    V             Change to back to home view ('all' by default)\n"
      "    v             Start a view command\n"
@@ -136,11 +134,11 @@ void owl_help()
       owl_variable_describe(owl_global_get_vardict(&g), varname, &fm);
     }
   }
-  owl_variable_dict_namelist_free(&varnames);
+  owl_variable_dict_namelist_cleanup(&varnames);
 
   owl_fmtext_append_normal(&fm, "\n");
 
   owl_function_popless_fmtext(&fm);
 
-  owl_fmtext_free(&fm);
+  owl_fmtext_cleanup(&fm);
 }

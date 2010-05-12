@@ -3,19 +3,21 @@ use lib (dirname($0) . '/../perl/lib');
 
 package BarnOwl;
 
+use BarnOwl;
+
 use strict;
 use warnings;
+no warnings 'redefine';
 use Carp;
 
-sub bootstrap {}
-sub get_data_dir {"."}
-sub get_config_dir {"."}
-sub create_style {}
+sub get_data_dir() {"."}
+sub get_config_dir() {"."}
+sub create_style($$) {}
 
 our $ml = BarnOwl::MessageList->new();
-sub message_list {$ml}
+sub message_list() {$ml}
 
-sub debug {
+sub debug($) {
     warn "[DEBUG] ", shift, "\n" if $ENV{TEST_VERBOSE};
 }
 
@@ -28,7 +30,7 @@ sub new_filter {
     $filters{$name} = $sub;
 }
 
-sub filter_message_match {
+sub filter_message_match($$) {
     my $filter = shift;
     my $m = shift;
     unless(exists $filters{$filter}) {
@@ -37,12 +39,11 @@ sub filter_message_match {
     return $filters{$filter}->($m);
 }
 
-sub BarnOwl::Internal::new_command {}
-sub BarnOwl::Internal::new_variable_bool {}
-sub BarnOwl::Internal::new_variable_int {}
-sub BarnOwl::Internal::new_variable_string {}
-
-use BarnOwl;
+sub BarnOwl::Internal::new_command($$$$$) {}
+sub BarnOwl::Internal::new_variable_bool($$$$) {}
+sub BarnOwl::Internal::new_variable_int($$$$) {}
+sub BarnOwl::Internal::new_variable_string($$$$) {}
+sub BarnOwl::Editwin::save_excursion(&) {}
 
 if($ENV{TEST_VERBOSE}) {
     $BarnOwl::View::DEBUG = 1;
@@ -72,3 +73,5 @@ BarnOwl::new_filter(prime  => sub {is_prime(shift->{num})});
 # Use a smaller fill step for testing so we can test on small message
 # lists.
 $BarnOwl::View::FILL_STEP = 10;
+
+1;
