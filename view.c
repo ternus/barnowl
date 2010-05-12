@@ -84,7 +84,7 @@ const char *owl_view_get_filtname(const owl_view *v)
   return SvPV_nolen(name);
 }
 
-void owl_view_free(owl_view *v)
+void owl_view_delete(owl_view *v)
 {
   SvREFCNT_dec((SV*)v);
 }

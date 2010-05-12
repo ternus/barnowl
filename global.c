@@ -686,7 +686,7 @@ owl_view *owl_global_get_current_view(owl_global *g) {
 }
 
 void owl_global_set_current_view(owl_global *g, owl_view *v) {
-  owl_view_free(g->current_view);
+  owl_view_delete(g->current_view);
   g->current_view = v;
 }
 
