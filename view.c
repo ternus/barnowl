@@ -229,12 +229,12 @@ int owl_view_iterator_cmp(owl_view_iterator *it1, owl_view_iterator *it2)
   return cmp;
 }
 
-void owl_view_iterator_free(owl_view_iterator *it)
+void owl_view_iterator_delete(owl_view_iterator *it)
 {
   SvREFCNT_dec(it);
 }
 
-owl_view_iterator* owl_view_iterator_free_later(owl_view_iterator *it)
+owl_view_iterator* owl_view_iterator_delete_later(owl_view_iterator *it)
 {
   return sv_2mortal(it);
 }

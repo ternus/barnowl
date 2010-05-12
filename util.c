@@ -16,7 +16,7 @@ void sepbar(const char *in)
   int x, y;
   const char *foo, *appendtosepbar;
 
-  iter = owl_view_iterator_free_later(owl_view_iterator_new());
+  iter = owl_view_iterator_delete_later(owl_view_iterator_new());
 
   sepwin=owl_global_get_curs_sepwin(&g);
   ml=owl_global_get_msglist(&g);

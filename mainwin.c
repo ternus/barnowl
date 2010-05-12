@@ -20,7 +20,7 @@ void owl_mainwin_redisplay(owl_mainwin *mw)
   GList *fl;
   const owl_filter *f;
 
-  iter = owl_view_iterator_free_later(owl_view_iterator_new());
+  iter = owl_view_iterator_delete_later(owl_view_iterator_new());
 
   recwin=owl_global_get_curs_recwin(&g);
   topmsg=owl_global_get_topmsg(&g);

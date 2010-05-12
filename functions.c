@@ -532,7 +532,7 @@ void owl_function_nextmsg_full(const char *filter, int skip_deleted, int last_if
   const owl_filter *f = NULL;
   const owl_message *m;
 
-  it = owl_view_iterator_free_later(owl_view_iterator_new());
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
   v=owl_global_get_current_view(&g);
 
   if (filter) {
@@ -584,7 +584,7 @@ void owl_function_prevmsg_full(const char *filter, int skip_deleted, int first_i
   const owl_filter *f = NULL;
   const owl_message *m;
 
-  it = owl_view_iterator_free_later(owl_view_iterator_new());
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
 
   v=owl_global_get_current_view(&g);
 
@@ -723,7 +723,7 @@ void owl_function_expunge(void)
 void owl_function_firstmsg(void)
 {
   owl_view_iterator *it;
-  it = owl_view_iterator_free_later(owl_view_iterator_new());
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
   owl_view_iterator_init_start(it, owl_global_get_current_view(&g));
   owl_global_set_curmsg(&g, it);
   owl_global_set_topmsg(&g, it);
@@ -735,7 +735,7 @@ void owl_function_lastmsg_noredisplay(void)
 {
   const owl_view *v;
   owl_view_iterator *it;
-  it = owl_view_iterator_free_later(owl_view_iterator_new());
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
 
   v=owl_global_get_current_view(&g);
   owl_view_iterator_init_end(it, v);
@@ -1003,7 +1003,7 @@ void owl_function_calculate_topmsg_top(int direction, const owl_view *v, owl_vie
 void owl_function_calculate_topmsg_neartop(int direction, const owl_view *v, owl_view_iterator *curmsg, owl_view_iterator *topmsg, int recwinlines)
 {
   owl_view_iterator *it;
-  it = owl_view_iterator_free_later(owl_view_iterator_new());
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
   owl_view_iterator_clone(it, curmsg);
   owl_view_iterator_prev(it);
   if (owl_message_get_numlines(owl_view_iterator_get_message(it))
@@ -1016,7 +1016,7 @@ void owl_function_calculate_topmsg_center(int direction, const owl_view *v, owl_
 {
   int lines;
   owl_view_iterator *it;
-  it = owl_view_iterator_free_later(owl_view_iterator_new());
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
   owl_view_iterator_clone(it, curmsg);
 
   lines = 0;
@@ -1076,7 +1076,7 @@ void owl_function_calculate_topmsg_normal(int direction, const owl_view *v, owl_
 {
   int savey, lines, y;
   owl_view_iterator *it;
-  it = owl_view_iterator_free_later(owl_view_iterator_new());
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
 
   if (!owl_view_iterator_is_valid(curmsg)) return;
 
@@ -1542,7 +1542,7 @@ void owl_function_resize_typwin(int newsize)
 void owl_function_mainwin_pagedown(void)
 {
   owl_view_iterator *iter;
-  iter = owl_view_iterator_free_later(owl_view_iterator_new());
+  iter = owl_view_iterator_delete_later(owl_view_iterator_new());
 
   owl_view_iterator_clone(iter, owl_mainwin_get_last_msg(owl_global_get_mainwin(&g)));
   if (!owl_view_iterator_is_valid(iter)) return;
@@ -1667,7 +1667,7 @@ void owl_function_delete_automsgs(void)
   const owl_view *v;
   const owl_filter *f;
 
-  it = owl_view_iterator_free_later(owl_view_iterator_new());
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
 
   /* get the trash filter */
   f=owl_global_get_filter(&g, "trash");
@@ -2023,7 +2023,7 @@ void owl_function_change_currentview_filter(const char *filtname)
   owl_view_iterator *it;
   const owl_message *curm=NULL;
 
-  it = owl_view_iterator_free_later(owl_view_iterator_new());
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
 
   v=owl_global_get_current_view(&g);
 
@@ -2465,7 +2465,7 @@ void owl_function_delete_curview_msgs(int flag)
   owl_message *m;
   int count = 0;
 
-  it = owl_view_iterator_free_later(owl_view_iterator_new());
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
 
   v=owl_global_get_current_view(&g);
 
@@ -2911,7 +2911,7 @@ void owl_function_search_helper(int mode, int direction)
   owl_view_iterator *it;
   owl_message *m;
 
-  it = owl_view_iterator_free_later(owl_view_iterator_new());
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
 
   v=owl_global_get_current_view(&g);
   
@@ -3116,7 +3116,7 @@ void owl_function_dump(const char *filename)
   owl_function_error("Unsupported");
   return;
 
-  it = owl_view_iterator_free_later(owl_view_iterator_new());
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
   v = owl_global_get_current_view(&g);
 
   /* in the future make it ask yes/no */
