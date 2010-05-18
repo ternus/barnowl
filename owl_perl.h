@@ -37,6 +37,7 @@
     } \
     if (SvTRUE(ERRSV)) { \
       if(fatalp) { \
+        endwin();                       \
         printf(err, SvPV_nolen(ERRSV)); \
         exit(-1); \
       } else { \
@@ -51,6 +52,8 @@
     FREETMPS; \
     LEAVE; \
 }
+
+extern int endwin(void);
 
 /*
  * There's no way to enforce constness into perlspace, so we use this
