@@ -75,6 +75,11 @@ void owl_view_consider_message(owl_view *v, const owl_message *m)
   ov_mark_message(v, id, owl_filter_message_match(f, m));
 }
 
+void owl_view_handle_deletion(owl_view *v, int id)
+{
+  ov_mark_message(v, id, false);
+}
+
 int owl_view_is_empty(const owl_view *v)
 {
   owl_view_iterator it;

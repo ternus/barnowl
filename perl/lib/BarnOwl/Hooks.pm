@@ -215,7 +215,6 @@ sub _get_blist {
 
 sub _invalidate_filter {
     my $filter = shift;
-    BarnOwl::View::invalidate_filter($filter);
 }
 
 sub _get_quickstart {

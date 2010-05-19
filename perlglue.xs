@@ -719,3 +719,21 @@ mark()
 		}
 	OUTPUT:
 		RETVAL
+
+MODULE = BarnOwl		PACKAGE = BarnOwl::View
+
+void
+message_deleted(cls, id)
+	const char *cls;
+	int id;
+	CODE:
+		(void)cls;
+		owl_view_handle_deletion(owl_global_get_current_view(&g), id);
+
+void
+consider_message(cls, msg)
+	const char *cls;
+	SV *msg;
+	CODE:
+		(void)cls;
+		owl_view_consider_message(owl_global_get_current_view(&g), msg);
