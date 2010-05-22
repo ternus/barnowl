@@ -730,7 +730,7 @@ message_deleted(cls, id)
 	int id;
 	CODE:
 		(void)cls;
-		owl_view_handle_deletion(owl_global_get_current_view(&g), id);
+		owl_view_handle_deletion(id);
 
 void
 owl_view_consider_message(cls, msg)

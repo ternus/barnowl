@@ -43,6 +43,8 @@ static int ovi_prev(owl_view_iterator *it);
 static int ovi_fixup(owl_view_iterator *it);
 static int ovi_fill_forward(owl_view_iterator *it);
 
+static GList *all_views = NULL;
+
 owl_view* owl_view_new(const char *filtname)
 {
   owl_view *v = owl_malloc(sizeof *v);
@@ -53,6 +55,7 @@ owl_view* owl_view_new(const char *filtname)
   v->next_cached_id  = 4096 * 8;
   v->saved_id = 0;
   v->filter_name = owl_strdup(filtname);
+  all_views = g_list_prepend(all_views, v);
   return v;
 }
 
@@ -75,9 +78,13 @@ void owl_view_consider_message(owl_view *v, const owl_message *m)
   ov_mark_message(v, id, owl_filter_message_match(f, m));
 }
 
-void owl_view_handle_deletion(owl_view *v, int id)
+void owl_view_handle_deletion(int id)
 {
-  ov_mark_message(v, id, false);
+  GList *l = all_views;
+  while(l) {
+    ov_mark_message(l->data, id, false);
+    l = g_list_next(l);
+  }
 }
 
 int owl_view_is_empty(const owl_view *v)
@@ -114,6 +121,7 @@ const char *owl_view_get_filtname(const owl_view *v)
 
 void owl_view_delete(owl_view *v)
 {
+  all_views = g_list_remove(all_views, v);
   ov_range *r = v->ranges;
   owl_free(v->messages);
   owl_free(v->filter_name);
