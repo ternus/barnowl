@@ -29,6 +29,8 @@ my $view;
 my $i1;
 my $i2;
 
+BarnOwl::filter('one', 'num', '^1$');
+
 $view = BarnOwl::View->new('all');
 
 $i1 = BarnOwl::View::Iterator->new;
@@ -36,8 +38,8 @@ $i2 = BarnOwl::View::Iterator->new;
 
 # cmp() normalizes correctly
 
-$i1->initialize_at_start($view);
-$i2->initialize_at_start($view);
+$i1->init_start($view);
+$i2->init_start($view);
 
 is($i1->cmp($i2), 0);
 is($i2->cmp($i1), 0);
@@ -59,7 +61,7 @@ is($i2->cmp($i1), 0);
 $view = BarnOwl::View->new('one');
 ok(!$view->is_empty, "View with one message is not empty");
 
-$i1->initialize_at_start($view);
+$i1->init_start($view);
 
 ok(!$i1->is_at_end, "With one message, start != end");
 
@@ -73,12 +75,16 @@ ok($view->is_empty, "Deleting last message empties view");
 
 ## Iterators don't loop forever on empty message list
 
-$BarnOwl::ml = BarnOwl::MessageList->new();
-
-BarnOwl::View::invalidate_filter('all');
+my $m;
+$ml->iterate_begin(0);
+while ($m = ($ml->iterate_next)) {
+    $m->delete;
+}
+$ml->iterate_done;
+$ml->expunge;
 
 $view = BarnOwl::View->new('all');
-$i1->initialize_at_start($view);
+$i1->init_start($view);
 
 ok($i1->is_at_start);
 ok($i1->is_at_end);
