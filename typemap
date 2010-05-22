@@ -1,8 +1,31 @@
 TYPEMAP
 utf8 *         T_PV_UTF8
 const utf8 *   T_PV_UTF8
+BarnOwl_View   T_PTROBJ_SPECIAL
+BarnOwl_View_Iterator   T_PTROBJ_SPECIAL
+owl_message *  T_MESSAGE
+
+INPUT
+T_PTROBJ_SPECIAL
+        if (sv_derived_from($arg, \"${(my $ntt=$ntype)=~s/_/::/g;\$ntt}\")) {
+                IV tmp = SvIV((SV*)SvRV($arg));
+                $var = INT2PTR($type, tmp);
+        }
+        else
+                croak(\"$var is not of type ${(my $ntt=$ntype)=~s/_/::/g;\$ntt}\")
 
 OUTPUT
 T_PV_UTF8
         sv_setpv((SV*)$arg, $var);
         SvUTF8_on((SV*)$arg);
+
+T_PTROBJ_SPECIAL
+        sv_setref_pv($arg, \"${(my $ntt=$ntype)=~s/_/::/g;\$ntt}\",
+        (void*)$var);
+
+T_MESSAGE
+        if ($var) {
+                $arg = $var;
+        }
+        else
+                sv_setsv($arg, &PL_sv_undef);

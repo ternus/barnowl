@@ -13,6 +13,8 @@
 		sv_derived_from(sv, "BarnOwl::Message"))
 
 typedef char utf8;
+typedef owl_view *BarnOwl_View;
+typedef owl_view_iterator *BarnOwl_View_Iterator;
 
 	/*************************************************************
 	 * NOTE
@@ -720,7 +722,7 @@ mark()
 	OUTPUT:
 		RETVAL
 
-MODULE = BarnOwl		PACKAGE = BarnOwl::View
+MODULE = BarnOwl		PACKAGE = BarnOwl::View		PREFIX = owl_view_
 
 void
 message_deleted(cls, id)
@@ -731,9 +733,104 @@ message_deleted(cls, id)
 		owl_view_handle_deletion(owl_global_get_current_view(&g), id);
 
 void
-consider_message(cls, msg)
+owl_view_consider_message(cls, msg)
 	const char *cls;
 	SV *msg;
 	CODE:
 		(void)cls;
 		owl_view_consider_message(owl_global_get_current_view(&g), msg);
+
+BarnOwl_View
+new(cls, filtname)
+	const char *cls;
+	const char *filtname;
+	CODE:
+		(void)cls;
+		RETVAL = owl_view_new(filtname);
+	OUTPUT:
+		RETVAL
+
+const utf8 *
+owl_view_get_filtname(view)
+	BarnOwl_View view;
+
+bool
+owl_view_is_empty(view)
+	BarnOwl_View view;
+
+void
+DESTROY(view)
+	BarnOwl_View view;
+	CODE:
+		owl_view_delete(view);
+
+MODULE = BarnOwl		PACKAGE = BarnOwl::View::Iterator		PREFIX = owl_view_iterator_
+
+BarnOwl_View_Iterator
+new(cls)
+	const char *cls;
+	CODE:
+		(void)cls;
+		RETVAL = owl_view_iterator_new();
+	OUTPUT:
+		RETVAL
+
+void
+owl_view_iterator_invalidate(it)
+	BarnOwl_View_Iterator it;
+
+bool
+owl_view_iterator_is_valid(it)
+	BarnOwl_View_Iterator it;
+
+void
+owl_view_iterator_init_start(it, v)
+	BarnOwl_View_Iterator it;
+	BarnOwl_View v;
+
+void
+owl_view_iterator_init_end(it, v)
+	BarnOwl_View_Iterator it;
+	BarnOwl_View v;
+
+void
+owl_view_iterator_init_id(it, v, id)
+	BarnOwl_View_Iterator it;
+	BarnOwl_View v;
+	int id;
+
+void
+owl_view_iterator_clone(lhs, rhs)
+	BarnOwl_View_Iterator lhs;
+	BarnOwl_View_Iterator rhs;
+
+bool
+owl_view_iterator_is_at_end(it)
+	BarnOwl_View_Iterator it;
+
+bool
+owl_view_iterator_is_at_start(it)
+	BarnOwl_View_Iterator it;
+
+void
+owl_view_iterator_prev(it)
+	BarnOwl_View_Iterator it;
+
+void
+owl_view_iterator_next(it)
+	BarnOwl_View_Iterator it;
+
+owl_message *
+owl_view_iterator_get_message(it)
+	BarnOwl_View_Iterator it;
+
+int
+owl_view_iterator_cmp(lhs, rhs)
+	BarnOwl_View_Iterator lhs;
+	BarnOwl_View_Iterator rhs;
+
+void
+DESTROY(it)
+	BarnOwl_View_Iterator it;
+	CODE:
+		owl_view_iterator_delete(it);
