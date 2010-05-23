@@ -279,24 +279,19 @@ static owl_variable variables_to_init[] = {
 
 
   OWLVAR_INT(    "edit:maxfillcols" /* %OwlVarStub:edit_maxfillcols */, 70,
-	         "maximum number of columns for M-q to fill text to",
-		 "This specifies the maximum number of columns for M-q\n"
-		 "to fill text to.  If set to 0, ther will be no maximum\n"
-		 "limit.  In all cases, the current width of the screen\n"
-		 "will also be taken into account.  It will be used instead\n"
-		 "if it is narrower than the maximum, or if this\n"
-		 "is set to 0.\n" ),
+	         "maximum number of columns for M-q (edit:fill-paragraph) to fill text to",
+                 "This specifies the maximum number of columns for M-q to fill text\n"
+                 "to.  If set to 0, M-q will wrap to the width of the window, and\n"
+                 "values less than 0 disable M-q entirely.\n"),
 
-  OWLVAR_INT(    "edit:maxwrapcols" /* %OwlVarStub:edit_maxwrapcols */, 0,
+  OWLVAR_INT(    "edit:maxwrapcols" /* %OwlVarStub:edit_maxwrapcols */, 70,
 	         "maximum number of columns for line-wrapping",
-		 "This specifies the maximum number of columns for\n"
-		 "auto-line-wrapping.  If set to 0, ther will be no maximum\n"
-		 "limit.  In all cases, the current width of the screen\n"
-		 "will also be taken into account.  It will be used instead\n"
-		 "if it is narrower than the maximum, or if this\n"
-		 "is set to 0.\n\n"
-		 "It is recommended that outgoing messages be no wider\n"
-		 "than 60 columns, as a courtesy to recipients.\n"),
+                 "This specifies the maximum number of columns for\n"
+                 "auto-line-wrapping.  If set to 0, text will be wrapped at the\n"
+                 "window width. Values less than 0 disable automatic wrapping.\n"
+                 "\n"
+                 "As a courtesy to recipients, it is recommended that outgoing\n"
+                 "Zephyr messages be no wider than 70 columns.\n"),
 
   OWLVAR_INT( "aim_ignorelogin_timer" /* %OwlVarStub */, 15,
 	      "number of seconds after AIM login to ignore login messages",
@@ -404,7 +399,7 @@ int owl_variable_typewinsize_set(owl_variable *v, const void *newval)
 {
   int rv;
   rv = owl_variable_int_set_default(v, newval);
-  if (0 == rv) owl_function_resize();
+  if (0 == rv) owl_global_set_relayout_pending(&g);
   return(rv);
 }
 
@@ -432,9 +427,18 @@ int owl_variable_aaway_set(owl_variable *v, const void *newval)
 
 int owl_variable_pseudologins_set(owl_variable *v, const void *newval)
 {
+  static owl_timer *timer = NULL;
   if (newval) {
     if (*(const int*)newval == 1) {
       owl_function_zephyr_buddy_check(0);
+      if (timer == NULL) {
+        timer = owl_select_add_timer(180, 180, owl_zephyr_buddycheck_timer, NULL, NULL);
+      }
+    } else {
+      if (timer != NULL) {
+        owl_select_remove_timer(timer);
+        timer = NULL;
+      }
     }
   }
   return owl_variable_bool_set_default(v, newval);

@@ -184,6 +184,10 @@ typedef void HV;
 #define OWL_VARIABLE_BOOL       2
 #define OWL_VARIABLE_STRING     3
 
+#define OWL_OUTPUT_RETURN       0
+#define OWL_OUTPUT_POPUP        1
+#define OWL_OUTPUT_ADMINMSG     2
+
 #define OWL_FILTER_MAX_DEPTH    300
 
 #define OWL_KEYMAP_MAXSTACK     20
@@ -553,10 +557,12 @@ typedef struct _owl_global {
   owl_view *current_view;
   owl_style *current_style;
   owl_messagelist *msglist;
+  WINDOW *input_pad;
   PANEL *recpan, *seppan, *msgpan, *typpan;
   int needrefresh;
   int rightshift;
   volatile sig_atomic_t resizepending;
+  int relayoutpending;
   int recwinlines;
   char *thishost;
   char *homedir;

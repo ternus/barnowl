@@ -1222,13 +1222,10 @@ void owl_function_set_cursor(WINDOW *win)
 
 void owl_function_full_redisplay(void)
 {
-  redrawwin(owl_global_get_curs_recwin(&g));
-  redrawwin(owl_global_get_curs_sepwin(&g));
-  /* Work around curses segfualts with windows off the screen */
-  if (g.lines >= owl_global_get_typwin_lines(&g)+2)
-      redrawwin(owl_global_get_curs_typwin(&g));
-  if (g.lines >= 2)
-      redrawwin(owl_global_get_curs_msgwin(&g));
+  touchwin(owl_global_get_curs_recwin(&g));
+  touchwin(owl_global_get_curs_sepwin(&g));
+  touchwin(owl_global_get_curs_typwin(&g));
+  touchwin(owl_global_get_curs_msgwin(&g));
 
   sepbar("");
   owl_function_makemsg("");
@@ -1536,7 +1533,7 @@ void owl_function_page_curmsg(int step)
 void owl_function_resize_typwin(int newsize)
 {
   owl_global_set_typwin_lines(&g, newsize);
-  owl_function_resize();
+  owl_global_set_relayout_pending(&g);
 }
 
 void owl_function_mainwin_pagedown(void)
@@ -1955,19 +1952,19 @@ char *owl_function_exec(int argc, const char *const *argv, const char *buff, int
   buff = skiptokens(buff, 1);
   newbuff = owl_sprintf("%s%s", buff, redirect);
 
-  if (type == 1) {
+  if (type == OWL_OUTPUT_POPUP) {
     owl_popexec_new(newbuff);
   } else {
     p = popen(newbuff, "r");
     out = owl_slurp(p);
     pclose(p);
     
-    if (type==1) {
+    if (type == OWL_OUTPUT_POPUP) {
       owl_function_popless_text(out);
-    } else if (type==0) {
+    } else if (type == OWL_OUTPUT_RETURN) {
       owl_free(newbuff);
       return out;
-    } else if (type==2) {
+    } else if (type == OWL_OUTPUT_ADMINMSG) {
       owl_function_adminmsg(buff, out);
     } else {
       owl_function_popless_text(out);
@@ -1997,11 +1994,11 @@ char *owl_function_perl(int argc, const char *const *argv, const char *buff, int
 
   perlout = owl_perlconfig_execute(buff);
   if (perlout) { 
-    if (type==1) {
+    if (type == OWL_OUTPUT_POPUP) {
       owl_function_popless_text(perlout);
-    } else if (type==2) {
+    } else if (type == OWL_OUTPUT_ADMINMSG) {
       owl_function_adminmsg(buff, perlout);
-    } else if (type==0) {
+    } else if (type == OWL_OUTPUT_RETURN) {
       return perlout;
     } else {
       owl_function_popless_text(perlout);
@@ -2305,7 +2302,7 @@ char *owl_function_classinstfilt(const char *c, const char *i, int related)
   
   /* if it already exists then go with it.  This lets users override */
   if (owl_global_get_filter(&g, filtname)) {
-    return(filtname);
+    goto done;
   }
 
   /* create the new filter */
@@ -2335,6 +2332,7 @@ char *owl_function_classinstfilt(const char *c, const char *i, int related)
   owl_global_add_filter(&g, f);
 
   owl_free(argbuff);
+done:
   owl_free(class);
   if (instance) {
     owl_free(instance);
@@ -2363,7 +2361,7 @@ char *owl_function_zuserfilt(const char *user)
 
   /* if it already exists then go with it.  This lets users override */
   if (owl_global_get_filter(&g, filtname)) {
-    return(owl_strdup(filtname));
+    return filtname;
   }
 
   /* create the new-internal filter */

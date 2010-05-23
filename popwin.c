@@ -27,10 +27,6 @@ int owl_popwin_up(owl_popwin *pw)
   pw->borderpanel = new_panel(borderwin);
   popwin = newwin(pw->lines-2, pw->cols-2, startline+1, startcol+1);
   pw->poppanel = new_panel(popwin);
-  
-  meta(popwin,TRUE);
-  nodelay(popwin, 1);
-  keypad(popwin, TRUE);
 
   werase(popwin);
   werase(borderwin);
@@ -67,15 +63,12 @@ int owl_popwin_close(owl_popwin *pw)
 
   pw->active=0;
   owl_global_set_needrefresh(&g);
-  owl_mainwin_redisplay(owl_global_get_mainwin(&g));
-  owl_function_full_redisplay();
   return(0);
 }
 
 int owl_popwin_is_active(const owl_popwin *pw)
 {
-  if (pw->active==1) return(1);
-  return(0);
+  return pw->active;
 }
 
 WINDOW *owl_popwin_get_curswin(const owl_popwin *pw)

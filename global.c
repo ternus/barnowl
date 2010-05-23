@@ -53,6 +53,7 @@ void owl_global_init(owl_global *g) {
   owl_dict_create(&(g->styledict));
   g->curmsg_vert_offset=0;
   g->resizepending=0;
+  g->relayoutpending = 0;
   g->direction=OWL_DIRECTION_DOWNWARDS;
   g->zaway=0;
   if (has_colors()) {
@@ -114,6 +115,12 @@ void owl_global_init(owl_global *g) {
   g->timerlist = NULL;
   g->interrupted = FALSE;
   g->fmtext_seq = 0;
+
+  /* set up a pad for input */
+  g->input_pad = newpad(1, 1);
+  nodelay(g->input_pad, 1);
+  keypad(g->input_pad, 1);
+  meta(g->input_pad, 1);
 }
 
 /* Called once perl has been initialized */
@@ -136,7 +143,7 @@ void _owl_panel_set_window(PANEL **pan, WINDOW *win)
   WINDOW *oldwin;
 
   if (win == NULL) {
-    owl_function_debugmsg("_owl_panel_set_window: passed NULL win (failed to allocate?)\n");
+    owl_function_debugmsg("_owl_panel_set_window: passed NULL win (failed to allocate?)");
     endwin();
     exit(50);
   }
@@ -163,8 +170,6 @@ void _owl_global_setup_windows(owl_global *g) {
     g->recwinlines=0;
   }
 
-  owl_function_debugmsg("_owl_global_setup_windows: about to call newwin(%i, %i, 0, 0)\n", g->recwinlines, cols);
-
   /* create the new windows */
   _owl_panel_set_window(&g->recpan, newwin(g->recwinlines, cols, 0, 0));
   _owl_panel_set_window(&g->seppan, newwin(1, cols, g->recwinlines, 0));
@@ -179,11 +184,7 @@ void _owl_global_setup_windows(owl_global *g) {
   idlok(owl_global_get_curs_sepwin(g), FALSE);
   idlok(owl_global_get_curs_msgwin(g), FALSE);
 
-  nodelay(owl_global_get_curs_typwin(g), 1);
-  keypad(owl_global_get_curs_typwin(g), TRUE);
   wmove(owl_global_get_curs_typwin(g), 0, 0);
-
-  meta(owl_global_get_curs_typwin(g), TRUE);
 }
 
 owl_context *owl_global_get_context(owl_global *g) {
@@ -397,6 +398,10 @@ void owl_global_set_resize_pending(owl_global *g) {
   g->resizepending=1;
 }
 
+void owl_global_set_relayout_pending(owl_global *g) {
+  g->relayoutpending = 1;
+}
+
 const char *owl_global_get_homedir(const owl_global *g) {
   if (g->homedir) return(g->homedir);
   return("/");
@@ -470,42 +475,54 @@ int owl_global_have_config(owl_global *g) {
   return(0);
 }
 
+/*
+ * Compute the size of the terminal. Try a ioctl, fallback to other stuff on
+ * fail.
+ */
+static void _owl_global_get_size(int *lines, int *cols) {
+  struct winsize size;
+  /* get the new size */
+  ioctl(STDIN_FILENO, TIOCGWINSZ, &size);
+  if (size.ws_row) {
+    *lines = size.ws_row;
+  } else {
+    *lines = LINES;
+  }
+
+  if (size.ws_col) {
+    *cols = size.ws_col;
+  } else {
+    *cols = COLS;
+  }
+}
+
 void owl_global_resize(owl_global *g, int x, int y) {
   /* resize the screen.  If x or y is 0 use the terminal size */
-  struct winsize size;
-    
   if (!g->resizepending) return;
   g->resizepending = 0;
 
-  if (!isendwin()) {
-    endwin();
+  _owl_global_get_size(&g->lines, &g->cols);
+  if (x != 0) {
+    g->lines = x;
+  }
+  if (y != 0) {
+    g->cols = y;
   }
 
-  /* get the new size */
-  ioctl(STDIN_FILENO, TIOCGWINSZ, &size);
-  if (x==0) {
-    if (size.ws_row) {
-      g->lines=size.ws_row;
-    } else {
-      g->lines=LINES;
-    } 
-  } else {
-      g->lines=x;
-  }
+  resizeterm(g->lines, g->cols);
 
-  if (y==0) {
-    if (size.ws_col) {
-      g->cols=size.ws_col;
-    } else {
-      g->cols=COLS;
-    } 
-  } else {
-    g->cols=y;
-  }
+  owl_function_debugmsg("New size is %i lines, %i cols.", g->lines, g->cols);
+  owl_global_set_relayout_pending(g);
+}
 
-#ifdef HAVE_RESIZETERM
-  resizeterm(size.ws_row, size.ws_col);
-#endif
+void owl_global_relayout(owl_global *g) {
+  owl_popwin *pw;
+  owl_viewwin *vw;
+
+  if (!g->relayoutpending) return;
+  g->relayoutpending = 0;
+
+  owl_function_debugmsg("Relayouting...");
 
   /* re-initialize the windows */
   _owl_global_setup_windows(g);
@@ -516,6 +533,22 @@ void owl_global_resize(owl_global *g, int x, int y) {
   /* recalculate the topmsg to make sure the current message is on
    * screen */
   owl_function_calculate_topmsg(OWL_DIRECTION_NONE);
+
+  /* recreate the popwin */
+  pw = owl_global_get_popwin(g);
+  if (owl_popwin_is_active(pw)) {
+    /*
+     * This is somewhat hacky; we probably want a proper windowing layer. We
+     * destroy the popwin and recreate it. Then the viewwin is redirected to
+     * the new window.
+     */
+    vw = owl_global_get_viewwin(g);
+    owl_popwin_close(pw);
+    owl_popwin_up(pw);
+    owl_viewwin_set_curswin(vw, owl_popwin_get_curswin(pw),
+	owl_popwin_get_lines(pw), owl_popwin_get_cols(pw));
+    owl_viewwin_redisplay(vw);
+  }
 
   /* refresh stuff */
   g->needrefresh=1;
@@ -528,7 +561,6 @@ void owl_global_resize(owl_global *g, int x, int y) {
 
   owl_function_full_redisplay();
 
-  owl_function_debugmsg("New size is %i lines, %i cols.", size.ws_row, size.ws_col);
   owl_function_makemsg("");
 }
 
@@ -1032,6 +1064,38 @@ void owl_global_set_interrupted(owl_global *g) {
 
 void owl_global_unset_interrupted(owl_global *g) {
   g->interrupted = 0;
+}
+
+void owl_global_setup_default_filters(owl_global *g)
+{
+  int i;
+  static const struct {
+    const char *name;
+    const char *desc;
+  } filters[] = {
+    { "personal",
+      "private ^true$ and ( not type ^zephyr$ or "
+      "( class ^message and ( instance ^personal$ or instance ^urgent$ ) ) )" },
+    { "trash",
+      "class ^mail$ or opcode ^ping$ or type ^admin$ or ( not login ^none$ )" },
+    { "wordwrap", "not ( type ^admin$ or type ^zephyr$ )" },
+    { "ping", "opcode ^ping$" },
+    { "auto", "opcode ^auto$" },
+    { "login", "not login ^none$" },
+    { "reply-lockout", "class ^noc or class ^mail$" },
+    { "out", "direction ^out$" },
+    { "aim", "type ^aim$" },
+    { "zephyr", "type ^zephyr$" },
+    { "none", "false" },
+    { "all", "true" },
+    { NULL, NULL }
+  };
+
+  owl_function_debugmsg("startup: creating default filters");
+
+  for (i = 0; filters[i].name != NULL; i++)
+    owl_global_add_filter(g, owl_filter_new_fromstring(filters[i].name,
+                                                       filters[i].desc));
 }
 
 /*

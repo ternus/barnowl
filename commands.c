@@ -91,15 +91,16 @@ const owl_cmd commands_to_init[]
 	      "Binds a key sequence to a command within a keymap.\n"
 	      "Use 'show keymaps' to see the existing keymaps.\n"
 	      "Key sequences may be things like M-C-t or NPAGE.\n\n"
-	      "Ex.: bindkey recv C-b command zwrite -c barnowl"
-              "SEE ALSO: bindkey"),
+	      "Ex.: bindkey recv C-b command zwrite -c barnowl\n"
+              "Ex.: bindkey recv m command start-command zwrite -c my-class -i \n\n"
+              "SEE ALSO: unbindkey, start-command"),
 
   OWLCMD_ARGS("unbindkey", owl_command_unbindkey, OWL_CTX_ANY,
 	      "removes a binding in a keymap",
 	      "bindkey <keymap> <keyseq>",
 	      "Removes a binding of a key sequence within a keymap.\n"
 	      "Use 'show keymaps' to see the existing keymaps.\n"
-	      "Ex.: unbindkey recv H"
+	      "Ex.: unbindkey recv H\n\n"
               "SEE ALSO: bindkey"),
 
   OWLCMD_ARGS("zwrite", owl_command_zwrite, OWL_CTX_INTERACTIVE,
@@ -632,6 +633,8 @@ const owl_cmd commands_to_init[]
 	      "view to it.\n\n"
 	      "SEE ALSO: filter, view, viewclass\n"),
   OWLCMD_ALIAS("vu", "viewuser"),
+  OWLCMD_ALIAS("viewperson", "viewuser"),
+  OWLCMD_ALIAS("vp", "viewuser"),
 
   OWLCMD_ARGS("show", owl_command_show, OWL_CTX_INTERACTIVE,
 	      "show information",
@@ -1281,16 +1284,18 @@ char *owl_command_smartnarrow(int argc, const char *const *argv, const char *buf
 
   char opt;
   int instance = 0, related = 0, i;
-  char **tmp_argv = owl_malloc(sizeof(char *) * argc);
+  const char **tmp_argv = owl_malloc(sizeof(char *) * argc);
 
   for (i = 0; i < argc; i++)
-    tmp_argv[i] = owl_strdup(argv[i]);
+    tmp_argv[i] = argv[i];
 
-  static struct option options[] = {
+  static const struct option options[] = {
     {"instance", 0, 0, 'i'},
     {"related",  0, 0, 'r'},
     {NULL,       0, 0, 0}};
-  while ((opt = getopt_long(argc, tmp_argv, "ir", options, NULL)) != -1) {
+
+  optind = 0;
+  while ((opt = getopt_long(argc, (char **)tmp_argv, "ir", options, NULL)) != -1) {
     switch (opt) {
       case 'i':
         instance = 1;
@@ -1304,10 +1309,6 @@ char *owl_command_smartnarrow(int argc, const char *const *argv, const char *buf
     }
   }
 
-  for (i = 0; i < argc; i++)
-    owl_free(tmp_argv[i]);
-  owl_free(tmp_argv);
-
   filtname = owl_function_smartfilter(instance, related);
 
   if (filtname) {
@@ -1316,7 +1317,8 @@ char *owl_command_smartnarrow(int argc, const char *const *argv, const char *buf
   }
 
 done:
-  optind = 0; /* reset getopt */
+  owl_free(tmp_argv);
+
   return NULL;
 }
 
@@ -1595,32 +1597,32 @@ char *owl_command_print(int argc, const char *const *argv, const char *buff)
 
 char *owl_command_exec(int argc, const char *const *argv, const char *buff)
 {
-  return owl_function_exec(argc, argv, buff, 0);
+  return owl_function_exec(argc, argv, buff, OWL_OUTPUT_RETURN);
 }
 
 char *owl_command_pexec(int argc, const char *const *argv, const char *buff)
 {
-  return owl_function_exec(argc, argv, buff, 1);
+  return owl_function_exec(argc, argv, buff, OWL_OUTPUT_POPUP);
 }
 
 char *owl_command_aexec(int argc, const char *const *argv, const char *buff)
 {
-  return owl_function_exec(argc, argv, buff, 2);
+  return owl_function_exec(argc, argv, buff, OWL_OUTPUT_ADMINMSG);
 }
 
 char *owl_command_perl(int argc, const char *const *argv, const char *buff)
 {
-  return owl_function_perl(argc, argv, buff, 0);
+  return owl_function_perl(argc, argv, buff, OWL_OUTPUT_RETURN);
 }
 
 char *owl_command_pperl(int argc, const char *const *argv, const char *buff)
 {
-  return owl_function_perl(argc, argv, buff, 1);
+  return owl_function_perl(argc, argv, buff, OWL_OUTPUT_POPUP);
 }
 
 char *owl_command_aperl(int argc, const char *const *argv, const char *buff)
 {
-  return owl_function_perl(argc, argv, buff, 2);
+  return owl_function_perl(argc, argv, buff, OWL_OUTPUT_ADMINMSG);
 }
 
 char *owl_command_multi(int argc, const char *const *argv, const char *buff)

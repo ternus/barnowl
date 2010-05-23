@@ -46,9 +46,9 @@ static void oe_restore_excursion(owl_editwin *e, oe_excursion *x);
 static void oe_restore_mark_only(owl_editwin *e, oe_excursion *x);
 static int oe_char_width(gunichar c, int column);
 static int oe_region_width(owl_editwin *e, int start, int end, int width);
-static int oe_find_display_line(owl_editwin *e, int *x, int index);
+static int oe_find_display_line(owl_editwin *e, int *x, int index, int *hard);
 static void oe_insert_char(owl_editwin *e, gunichar c);
-static int owl_editwin_limit_maxcols(int v, int maxv);
+static int owl_editwin_limit_maxcols(int width, int cols);
 static int owl_editwin_check_dotsend(owl_editwin *e);
 static int owl_editwin_is_char_in(owl_editwin *e, const char *set);
 static gunichar owl_editwin_get_char_at_point(owl_editwin *e);
@@ -124,12 +124,12 @@ static void _owl_editwin_init(owl_editwin *e,
   e->cursorx = -1;
   e->topindex = 0;
   e->excursions = NULL;
-  owl_editwin_set_curswin(e, win, winlines, wincols);
   e->style=style;
   if ((style!=OWL_EDITWIN_STYLE_MULTILINE) &&
       (style!=OWL_EDITWIN_STYLE_ONELINE)) {
     e->style=OWL_EDITWIN_STYLE_MULTILINE;
   }
+  owl_editwin_set_curswin(e, win, winlines, wincols);
   e->lock=0;
   e->dotsend=0;
   e->echochar='\0';
@@ -151,7 +151,10 @@ void owl_editwin_set_curswin(owl_editwin *e, WINDOW *w, int winlines, int wincol
   e->winlines=winlines;
   e->wincols=wincols;
   e->fillcol=owl_editwin_limit_maxcols(wincols-7, owl_global_get_edit_maxfillcols(&g));
-  e->wrapcol=owl_editwin_limit_maxcols(wincols-7, owl_global_get_edit_maxwrapcols(&g));
+  if (e->style == OWL_EDITWIN_STYLE_MULTILINE)
+    e->wrapcol=owl_editwin_limit_maxcols(wincols-7, owl_global_get_edit_maxwrapcols(&g));
+  else
+    e->wrapcol = 0;
 }
 
 /* echo the character 'ch' for each normal character keystroke,
@@ -217,14 +220,11 @@ void owl_editwin_do_callback(owl_editwin *e) {
   }
 }
 
-static int owl_editwin_limit_maxcols(int v, int maxv)
+static int owl_editwin_limit_maxcols(int width, int cols)
 {
-  /* maxv > 5 ? MAX(v, vax) : v */
-  if (maxv > 5 && v > maxv) {
-    return(maxv);
-  } else {
-    return(v);
-  }
+  if (cols == 0)
+    return width;
+  return cols;
 }
 
 /* set text to be 'locked in' at the beginning of the buffer, any
@@ -387,7 +387,7 @@ static int oe_char_width(gunichar c, int column)
   return cw;
 }
 
-static int oe_find_display_line(owl_editwin *e, int *x, int index)
+static int oe_find_display_line(owl_editwin *e, int *x, int index, int *hard)
 {
   int width = 0, cw;
   gunichar c;
@@ -404,9 +404,10 @@ static int oe_find_display_line(owl_editwin *e, int *x, int index)
     /* figure out how wide it is */
     cw = oe_char_width(c, width);
 
-    if (width + cw > e->wincols) {
+    if (width + cw > e->wincols - 1) {
       if (x != NULL && *x == width)
 	*x = -1;
+      if (hard != NULL) *hard = 0;
       break;
     }
     width += cw;
@@ -414,6 +415,7 @@ static int oe_find_display_line(owl_editwin *e, int *x, int index)
     if (c == '\n') {
       if (width < e->wincols)
 	++index; /* skip the newline */
+      if (hard != NULL) *hard = 1;
       break;
     }
 
@@ -422,6 +424,7 @@ static int oe_find_display_line(owl_editwin *e, int *x, int index)
     if (p == NULL) { /* we ran off the end */
       if (x != NULL && e->index > index)
 	*x = width + 1;
+      if (hard != NULL) *hard = 1;
       break;
     }
     index = p - e->buff;
@@ -451,7 +454,7 @@ static void oe_reframe(owl_editwin *e) {
       break;
     last = e->index;
     for (n = 0, i = e->index; i < index; n++)
-      i = oe_find_display_line(e, NULL, i);
+      i = oe_find_display_line(e, NULL, i, NULL);
     count += n == 0 ? 1 : n;
     if (count < goal)
       owl_editwin_point_move(e, -1);
@@ -460,7 +463,7 @@ static void oe_reframe(owl_editwin *e) {
   e->topindex = e->index;
   /* if we overshot, backtrack */
   for (n = 0; n < (count - goal); n++)
-    e->topindex = oe_find_display_line(e, NULL, e->topindex);
+    e->topindex = oe_find_display_line(e, NULL, e->topindex, NULL);
 
   oe_restore_excursion(e, &x);
 }
@@ -482,7 +485,7 @@ static void oe_mvaddnec(owl_editwin *e, int y, int x, int count)
 /* regenerate the text on the curses window */
 void owl_editwin_redisplay(owl_editwin *e)
 {
-  int x = -1, y = -1, t;
+  int x = -1, y = -1, t, hard;
   int line, index, lineindex, times = 0;
 
   do {
@@ -496,7 +499,7 @@ void owl_editwin_redisplay(owl_editwin *e)
     while(line < e->winlines) {
       lineindex = index;
       t = -1;
-      index = oe_find_display_line(e, &t, lineindex);
+      index = oe_find_display_line(e, &t, lineindex, &hard);
       if (x == -1 && t != -1)
 	x = t, y = line;
       if (index - lineindex) {
@@ -515,8 +518,10 @@ void owl_editwin_redisplay(owl_editwin *e)
 			oe_region_width(e, e->lock, index,
 					oe_region_width(e, lineindex, e->lock, 0)));
 	  } else
-	    oe_mvaddnec(e, line, 0, oe_region_width(e, line, index, 0));
+	    oe_mvaddnec(e, line, 0, oe_region_width(e, lineindex, index, 0));
 	}
+        if (!hard)
+          waddch(e->curswin, '\\');
       }
       line++;
     }
@@ -1095,6 +1100,10 @@ void owl_editwin_fill_paragraph(owl_editwin *e)
   gunichar ch;
   int sentence;
 
+  if (e->fillcol < 0)
+    /* auto-fill disabled */
+    return;
+
   oe_save_excursion(e, &x);
 
   /* Mark the end of the paragraph */
@@ -1231,7 +1240,8 @@ static void oe_insert_char(owl_editwin *e, gunichar c)
       return;
     }
 
-    if (e->cursorx != -1 && e->cursorx + oe_char_width(c, e->cursorx) > e->wrapcol) {
+    if (e->wrapcol > 0 && e->cursorx != -1 &&
+        e->cursorx + oe_char_width(c, e->cursorx) > e->wrapcol) {
       /* XXX this is actually wrong:
        * + If the line has been been wrapped, we can be past the wrap column but
        *   e->cursorx be much smaller.

@@ -148,40 +148,6 @@ void owl_start_curses(void) {
   owl_start_color();
 }
 
-static void owl_setup_default_filters(void)
-{
-  int i;
-  static const struct {
-    const char *name;
-    const char *desc;
-  } filters[] = {
-    { "personal",
-      "private ^true$ and ( not type ^zephyr$ or "
-      "( class ^message and ( instance ^personal$ or instance ^urgent$ ) ) )" },
-    { "trash",
-      "class ^mail$ or opcode ^ping$ or type ^admin$ or ( not login ^none$ )" },
-    { "wordwrap", "not ( type ^admin$ or type ^zephyr$ )" },
-    { "ping", "opcode ^ping$" },
-    { "auto", "opcode ^auto$" },
-    { "login", "not login ^none$" },
-    { "reply-lockout", "class ^noc or class ^mail$" },
-    { "out", "direction ^out$" },
-    { "aim", "type ^aim$" },
-    { "zephyr", "type ^zephyr$" },
-    { "none", "false" },
-    { "all", "true" },
-    { NULL, NULL }
-  };
-
-  owl_global_complete_setup(&g);
-
-  owl_function_debugmsg("startup: creating default filters");
-
-  for (i = 0; filters[i].name != NULL; i++)
-    owl_global_add_filter(&g, owl_filter_new_fromstring(filters[i].name,
-                                                        filters[i].desc));
-}
-
 /*
  * Process a new message passed to us on the message queue from some
  * protocol. This includes adding it to the message list, updating the
@@ -313,12 +279,9 @@ int owl_process_messages(owl_ps_action *d, void *p)
 void owl_process_input(const owl_io_dispatch *d, void *data)
 {
   owl_input j;
-  WINDOW *typwin;
-
-  typwin = owl_global_get_curs_typwin(&g);
 
   while (1) {
-    j.ch = wgetch(typwin);
+    j.ch = wgetch(g.input_pad);
     if (j.ch == ERR) return;
 
     j.uch = '\0';
@@ -341,7 +304,7 @@ void owl_process_input(const owl_io_dispatch *d, void *data)
       else bytes = 1;
       
       for (i = 1; i < bytes; i++) {
-        int tmp =  wgetch(typwin);
+        int tmp = wgetch(g.input_pad);
         /* If what we got was not a byte, or not a continuation byte */
         if (tmp > 0xff || !(tmp & 0x80 && ~tmp & 0x40)) {
           /* ill-formed UTF-8 code unit subsequence, put back the
@@ -461,18 +424,37 @@ void stderr_redirect_handler(const owl_io_dispatch *d, void *data)
 
 #endif /* OWL_STDERR_REDIR */
 
-void owl_zephyr_buddycheck_timer(owl_timer *t, void *data)
+static int owl_refresh_pre_select_action(owl_ps_action *a, void *data)
 {
-  if (owl_global_is_pseudologins(&g)) {
-    owl_function_debugmsg("Doing zephyr buddy check");
-    owl_function_zephyr_buddy_check(1);
+  /* if a resize has been scheduled, deal with it */
+  owl_global_resize(&g, 0, 0);
+  /* also handle relayouts */
+  owl_global_relayout(&g);
+
+  /* update the terminal if we need to */
+  if (owl_global_is_needrefresh(&g)) {
+    /* these are here in case a relayout changes the windows */
+    WINDOW *sepwin = owl_global_get_curs_sepwin(&g);
+    WINDOW *typwin = owl_global_get_curs_typwin(&g);
+
+    /* push all changed windows to screen */
+    update_panels();
+    /* leave the cursor in the appropriate window */
+    if (!owl_popwin_is_active(owl_global_get_popwin(&g))
+	&& owl_global_get_typwin(&g)) {
+      owl_function_set_cursor(typwin);
+    } else {
+      owl_function_set_cursor(sepwin);
+    }
+    doupdate();
+    owl_global_set_noneedrefresh(&g);
   }
+  return 0;
 }
 
 
 int main(int argc, char **argv, char **env)
 {
-  WINDOW *sepwin, *typwin;
   int argcsave;
   const char *const *argvsave;
   char *perlout, *perlerr;
@@ -550,7 +532,7 @@ int main(int argc, char **argv, char **env)
 
   owl_global_complete_setup(&g);
 
-  owl_setup_default_filters();
+  owl_global_setup_default_filters(&g);
 
   /* set the current view */
   owl_function_debugmsg("startup: setting the current view");
@@ -588,8 +570,6 @@ int main(int argc, char **argv, char **env)
   owl_function_debugmsg("startup: processing startup file");
   owl_function_source(NULL);
 
-  update_panels();
-
   /* Set the default style */
   owl_function_debugmsg("startup: setting startup and default style");
   if (0 != strcmp(owl_global_get_default_style(&g), "__unspecified__")) {
@@ -610,40 +590,16 @@ int main(int argc, char **argv, char **env)
   owl_global_pop_context(&g);
   owl_global_push_context(&g, OWL_CTX_READCONFIG|OWL_CTX_RECV, NULL, "recv");
 
-  owl_select_add_timer(180, 180, owl_zephyr_buddycheck_timer, NULL, NULL);
-
   /* If we ever deprecate the mainloop hook, remove this. */
   owl_select_add_timer(0, 1, owl_perlconfig_mainloop, NULL, NULL);
 
+  owl_select_add_pre_select_action(owl_refresh_pre_select_action, NULL, NULL);
   owl_select_add_pre_select_action(owl_process_messages, NULL, NULL);
 
   owl_function_debugmsg("startup: entering main loop");
   /* main loop */
   while (1) {
-
     owl_perl_savetmps();
-
-    /* if a resize has been scheduled, deal with it */
-    owl_global_resize(&g, 0, 0);
-
-    /* these are here in case a resize changes the windows */
-    sepwin=owl_global_get_curs_sepwin(&g);
-    typwin=owl_global_get_curs_typwin(&g);
-
-    /* update the terminal if we need to */
-    if (owl_global_is_needrefresh(&g)) {
-      /* push all changed windows to screen */
-      update_panels();
-      /* leave the cursor in the appropriate window */
-      if (!owl_popwin_is_active(owl_global_get_popwin(&g))
-	  && owl_global_get_typwin(&g)) {
-	owl_function_set_cursor(typwin);
-      } else {
-	owl_function_set_cursor(sepwin);
-      }
-      doupdate();
-      owl_global_set_noneedrefresh(&g);
-    }
 
     /* select on FDs we know about. */
     owl_select();
