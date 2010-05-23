@@ -15,7 +15,6 @@ sub new {
     my $self = {
         view     => undef,
         index    => undef,
-        _range   => undef
        };
     return bless $self, $class;
 }

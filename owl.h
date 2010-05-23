@@ -213,6 +213,8 @@ typedef void HV;
 #define OWL_META(key) ((key)|010000)
 /* OWL_CTRL is definied in kepress.c */
 
+#define ROUNDUP(x,n) (((x)+((n)-1))&(~((n)-1)))
+
 #define LINE 2048
 
 #ifdef HAVE_LIBZEPHYR
@@ -424,8 +426,8 @@ typedef struct _owl_filter {
   int bgcolor;
 } owl_filter;
 
-typedef SV owl_view;
-typedef SV owl_view_iterator;
+typedef struct _owl_view owl_view;
+typedef struct _owl_view_iterator owl_view_iterator;
 
 typedef struct _owl_mainwin {
   int curtruncated;

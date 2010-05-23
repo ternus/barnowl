@@ -59,6 +59,43 @@ void owl_messagelist_expunge(owl_messagelist *ml)
                        );
 }
 
+void owl_messagelist_iterate_begin(owl_message *ml, int pos, bool reverse)
+{
+  OWL_PERL_CALL_METHOD(ml, "iterate_begin",
+                       mXPUSHi(pos);
+                       mXPUSHi(reverse);,
+                       // Error
+                       "Error in iterate_begin: %s",
+                       1, // Fatal
+                       OWL_PERL_VOID_CALL
+                       );
+}
+
+owl_message* owl_messagelist_iterate_next(owl_message *ml)
+{
+  SV *msg;
+  OWL_PERL_CALL_METHOD(ml, "iterate_next",
+                       /* no args */,
+                       // Error
+                       "Error in iterate_next: %s",
+                       1, // Fatal
+                       msg = POPs;
+                       if(SvROK(msg)) SvREFCNT_inc(msg);
+                       );
+  return SvROK(msg) ? sv_2mortal(msg) : NULL;
+}
+
+void owl_messagelist_iterate_done(owl_message *ml)
+{
+  OWL_PERL_CALL_METHOD(ml, "iterate_done",
+                       /* no args */,
+                       // Error
+                       "Error in iterate_done: %s",
+                       1, // Fatal
+                       OWL_PERL_VOID_CALL
+                       );
+}
+
 void owl_messagelist_invalidate_formats(const owl_messagelist *ml)
 {
   owl_global_next_fmtext_seq(&g);

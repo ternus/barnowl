@@ -2051,6 +2051,8 @@ void owl_function_change_currentview_filter(const char *filtname)
    *   from the last time we were in the new view.  */
   if(curm == NULL) {
     curid = owl_view_get_saved_msgid(v);
+  } else {
+    curid = owl_message_get_id(curm);
   }
 
   owl_view_iterator_init_id(it, v, curid);
