@@ -22,7 +22,10 @@ struct _owl_view { /* noproto */
 struct _owl_view_iterator { /* noproto */
   owl_view *view;
   long      index;
+  struct _owl_view_iterator *delete_next;
 };
+
+static owl_view_iterator *ovi_delete_later;
 
 /* Internal prototypes */
 /* ov_range */
@@ -159,6 +162,7 @@ void owl_view_delete(owl_view *v)
 owl_view_iterator * owl_view_iterator_new(void)
 {
   owl_view_iterator *it = owl_malloc(sizeof *it);
+  it->delete_next = NULL;
   owl_view_iterator_invalidate(it);
   return it;
 }
@@ -247,8 +251,19 @@ void owl_view_iterator_delete(owl_view_iterator *it)
 
 owl_view_iterator* owl_view_iterator_delete_later(owl_view_iterator *it)
 {
-  /* XXX FIXME: Leak */
+  it->delete_next = ovi_delete_later;
+  ovi_delete_later = it;
   return it;
+}
+
+int owl_view_iterator_delayed_delete(owl_ps_action *d, void *p) {
+  owl_view_iterator *it;
+  while (ovi_delete_later) {
+    it = ovi_delete_later;
+    ovi_delete_later = it->delete_next;
+    owl_view_iterator_delete(it);
+  }
+  return 0;
 }
 
 /* Internal methods to the view and iterator implementation */

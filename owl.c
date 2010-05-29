@@ -595,6 +595,7 @@ int main(int argc, char **argv, char **env)
 
   owl_select_add_pre_select_action(owl_refresh_pre_select_action, NULL, NULL);
   owl_select_add_pre_select_action(owl_process_messages, NULL, NULL);
+  owl_select_add_pre_select_action(owl_view_iterator_delayed_delete, NULL, NULL);
 
   owl_function_debugmsg("startup: entering main loop");
   /* main loop */
