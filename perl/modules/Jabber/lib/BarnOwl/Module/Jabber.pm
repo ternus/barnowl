@@ -1252,7 +1252,7 @@ sub j2hash {
           . $props{error};
     }
     else { # chat, or normal (default)
-        $props{private} = 1;
+        $props{private} = 'true';
 
         my $connection;
         if ($dir eq 'in') {
