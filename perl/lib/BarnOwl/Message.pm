@@ -31,6 +31,9 @@ sub new {
         $args{login} = $args{loginout};
         delete $args{loginout};
     }
+    if (exists $args{private}) {
+        $args{private} = $args{private}?'true':'false';
+    }
     if($class eq __PACKAGE__ && $args{type}) {
         $class = "BarnOwl::Message::" . ucfirst $args{type};
     }
