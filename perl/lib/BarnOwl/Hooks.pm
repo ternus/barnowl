@@ -6,6 +6,8 @@ package BarnOwl::Hooks;
 use Carp;
 use List::Util qw(first);
 
+use BarnOwl::Commands;
+
 =head1 BarnOwl::Hooks
 
 =head1 DESCRIPTION
