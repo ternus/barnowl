@@ -9,6 +9,5 @@ if(! -x $tester) {
     plan skip_all => "Tester not built";
     exit 0;
 }
-$ENV{BARNOWL_DATA_DIR} = "$root/perl";
 
-exec(dirname($0) . "/../tester");
+system(dirname($0) . "/../tester", "--builtin");
