@@ -773,12 +773,16 @@ int owl_global_message_is_puntable(owl_global *g, const owl_message *m) {
 
 int owl_global_should_followlast(owl_global *g) {
   const owl_view *v;
-  
+  owl_view_iterator *it;
+
   if (!owl_global_is__followlast(g)) return(0);
-  
+
   v=owl_global_get_current_view(g);
-  
-  if (owl_view_iterator_is_at_end(owl_global_get_curmsg(g))) return(1);
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
+  owl_view_iterator_clone(it, owl_global_get_curmsg(g));
+  owl_view_iterator_next(it);
+
+  if (owl_view_iterator_is_at_end(it)) return(1);
   return(0);
 }
 
