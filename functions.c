@@ -1026,8 +1026,10 @@ void owl_function_calculate_topmsg_center(int direction, const owl_view *v, owl_
     lines += owl_message_get_numlines(owl_view_iterator_get_message(it));
     if (lines > recwinlines/2) break;
   }
-  if(owl_view_iterator_is_at_start(it))
-    owl_view_iterator_next(it);
+  if(owl_view_iterator_is_at_start(it)) {
+    lines += owl_message_get_numlines(owl_view_iterator_get_message(it));
+    if (lines > recwinlines) owl_view_iterator_next(it);
+  }
   owl_view_iterator_clone(topmsg, it);
 }
   
