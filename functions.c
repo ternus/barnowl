@@ -997,7 +997,7 @@ void owl_function_calculate_topmsg(int direction)
  */
 void owl_function_calculate_topmsg_top(int direction, const owl_view *v, owl_view_iterator *curmsg, owl_view_iterator *topmsg, int recwinlines)
 {
-  /* nop */
+  owl_view_iterator_clone(topmsg, curmsg);
 }
 
 void owl_function_calculate_topmsg_neartop(int direction, const owl_view *v, owl_view_iterator *curmsg, owl_view_iterator *topmsg, int recwinlines)
