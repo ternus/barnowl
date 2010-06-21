@@ -740,7 +740,6 @@ void owl_function_lastmsg_noredisplay(void)
   v=owl_global_get_current_view(&g);
   owl_view_iterator_init_end(it, v);
   owl_view_iterator_prev(it);
-  owl_global_set_topmsg(&g, it);
   owl_global_set_curmsg(&g, it);
   owl_function_calculate_topmsg(OWL_DIRECTION_UPWARDS);
   /* owl_mainwin_redisplay(owl_global_get_mainwin(&g)); */
