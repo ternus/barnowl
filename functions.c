@@ -1008,7 +1008,7 @@ void owl_function_calculate_topmsg_neartop(int direction, const owl_view *v, owl
   owl_view_iterator_prev(it);
   if (owl_message_get_numlines(owl_view_iterator_get_message(it))
       <  recwinlines/2) {
-    owl_view_iterator_clone(curmsg, it);
+    owl_view_iterator_clone(topmsg, it);
   }
 }
   
