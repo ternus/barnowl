@@ -967,23 +967,23 @@ void owl_function_calculate_topmsg(int direction)
 
   switch (owl_global_get_scrollmode(&g)) {
   case OWL_SCROLLMODE_TOP:
-    owl_function_calculate_topmsg_top(direction, v, curmsg, topmsg, recwinlines);
+    owl_function_calculate_topmsg_top(direction, curmsg, topmsg, recwinlines);
     break;
   case OWL_SCROLLMODE_NEARTOP:
-    owl_function_calculate_topmsg_neartop(direction, v, curmsg, topmsg, recwinlines);
+    owl_function_calculate_topmsg_neartop(direction, curmsg, topmsg, recwinlines);
     break;
   case OWL_SCROLLMODE_CENTER:
-    owl_function_calculate_topmsg_center(direction, v, curmsg, topmsg, recwinlines);
+    owl_function_calculate_topmsg_center(direction, curmsg, topmsg, recwinlines);
     break;
   case OWL_SCROLLMODE_PAGED:
-    owl_function_calculate_topmsg_paged(direction, v, curmsg, topmsg, recwinlines, 0);
+    owl_function_calculate_topmsg_paged(direction, curmsg, topmsg, recwinlines, 0);
     break;
   case OWL_SCROLLMODE_PAGEDCENTER:
-    owl_function_calculate_topmsg_paged(direction, v, curmsg, topmsg, recwinlines, 1);
+    owl_function_calculate_topmsg_paged(direction, curmsg, topmsg, recwinlines, 1);
     break;
   case OWL_SCROLLMODE_NORMAL:
   default:
-    owl_function_calculate_topmsg_normal(direction, v, curmsg, topmsg, recwinlines);
+    owl_function_calculate_topmsg_normal(direction, curmsg, topmsg, recwinlines);
   }
 }
 
@@ -994,12 +994,12 @@ void owl_function_calculate_topmsg(int direction)
  * the top message currently being displayed,
  * and the number of lines in the recwin.
  */
-void owl_function_calculate_topmsg_top(int direction, const owl_view *v, owl_view_iterator *curmsg, owl_view_iterator *topmsg, int recwinlines)
+void owl_function_calculate_topmsg_top(int direction, owl_view_iterator *curmsg, owl_view_iterator *topmsg, int recwinlines)
 {
   owl_view_iterator_clone(topmsg, curmsg);
 }
 
-void owl_function_calculate_topmsg_neartop(int direction, const owl_view *v, owl_view_iterator *curmsg, owl_view_iterator *topmsg, int recwinlines)
+void owl_function_calculate_topmsg_neartop(int direction, owl_view_iterator *curmsg, owl_view_iterator *topmsg, int recwinlines)
 {
   owl_view_iterator *it;
   it = owl_view_iterator_delete_later(owl_view_iterator_new());
@@ -1011,7 +1011,7 @@ void owl_function_calculate_topmsg_neartop(int direction, const owl_view *v, owl
   }
 }
   
-void owl_function_calculate_topmsg_center(int direction, const owl_view *v, owl_view_iterator *curmsg, owl_view_iterator *topmsg, int recwinlines)
+void owl_function_calculate_topmsg_center(int direction, owl_view_iterator *curmsg, owl_view_iterator *topmsg, int recwinlines)
 {
   int lines;
   owl_view_iterator *it;
@@ -1032,7 +1032,7 @@ void owl_function_calculate_topmsg_center(int direction, const owl_view *v, owl_
   owl_view_iterator_clone(topmsg, it);
 }
   
-void owl_function_calculate_topmsg_paged(int direction, const owl_view *v, owl_view_iterator *curmsg, owl_view_iterator *topmsg, int recwinlines, int center_on_page)
+void owl_function_calculate_topmsg_paged(int direction, owl_view_iterator *curmsg, owl_view_iterator *topmsg, int recwinlines, int center_on_page)
 {
   int lines;
   owl_view_iterator *it;
@@ -1058,7 +1058,7 @@ void owl_function_calculate_topmsg_paged(int direction, const owl_view *v, owl_v
     }
 
     if (center_on_page)
-      owl_function_calculate_topmsg_center(direction, v, curmsg, topmsg, recwinlines);
+      owl_function_calculate_topmsg_center(direction, curmsg, topmsg, recwinlines);
     else
       owl_view_iterator_clone(topmsg, it);
     return;
@@ -1075,7 +1075,7 @@ void owl_function_calculate_topmsg_paged(int direction, const owl_view *v, owl_v
   /* if we're off the bottom of the screen, scroll down */
   if (lines > recwinlines) {
     if (center_on_page) {
-      owl_function_calculate_topmsg_center(direction, v, curmsg, topmsg, recwinlines);
+      owl_function_calculate_topmsg_center(direction, curmsg, topmsg, recwinlines);
     } else {
       owl_view_iterator_clone(topmsg, curmsg);
     }
@@ -1084,7 +1084,7 @@ void owl_function_calculate_topmsg_paged(int direction, const owl_view *v, owl_v
   /* else just stay as we are... */
 }
 
-void owl_function_calculate_topmsg_normal(int direction, const owl_view *v, owl_view_iterator *curmsg, owl_view_iterator *topmsg, int recwinlines)
+void owl_function_calculate_topmsg_normal(int direction, owl_view_iterator *curmsg, owl_view_iterator *topmsg, int recwinlines)
 {
   int savey, lines, y;
   owl_view_iterator *it;
@@ -1095,7 +1095,7 @@ void owl_function_calculate_topmsg_normal(int direction, const owl_view *v, owl_
   /* If we're off the top of the screen then center */
   if (owl_view_iterator_cmp(curmsg, topmsg) < 0) {
       owl_view_iterator_clone(topmsg, curmsg);
-    owl_function_calculate_topmsg_center(direction, v, curmsg, topmsg, recwinlines);
+    owl_function_calculate_topmsg_center(direction, curmsg, topmsg, recwinlines);
   }
 
   /* Find number of lines from top to bottom of curmsg (store in savey) */
