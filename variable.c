@@ -349,8 +349,10 @@ static owl_variable variables_to_init[] = {
 	       "                 when user moves the cursor to the top\n"
 	       "                 or bottom of the screen.  When it moves,\n"
 	       "                 the screen will be paged up or down and\n"
-	       "                 the cursor will be near the center.\n",
-	       "normal,top,neartop,center,paged,pagedcenter" ),
+	       "                 the cursor will be near the center.\n"
+	       "   bottom      - An attempt is made to keep the current\n"
+	       "                 message near the bottom of the screen.\n",
+	       "normal,top,neartop,center,paged,pagedcenter,bottom" ),
 
   OWLVAR_BOOL( "narrow-related" /* %OwlVarStub:narrow_related */, 1,
                "Make smartnarrow use broader filters",

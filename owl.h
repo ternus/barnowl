@@ -143,6 +143,7 @@ typedef void HV;
 #define OWL_SCROLLMODE_CENTER      3
 #define OWL_SCROLLMODE_PAGED       4
 #define OWL_SCROLLMODE_PAGEDCENTER 5
+#define OWL_SCROLLMODE_BOTTOM      6
 
 #define OWL_TAB               3  /* This *HAS* to be the size of TABSTR below */
 #define OWL_TABSTR        "   "

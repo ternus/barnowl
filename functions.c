@@ -981,6 +981,9 @@ void owl_function_calculate_topmsg(int direction)
   case OWL_SCROLLMODE_PAGEDCENTER:
     owl_function_calculate_topmsg_paged(direction, curmsg, topmsg, recwinlines, 1);
     break;
+  case OWL_SCROLLMODE_BOTTOM:
+    owl_function_calculate_topmsg_bottom(direction, curmsg, topmsg, recwinlines);
+    break;
   case OWL_SCROLLMODE_NORMAL:
   default:
     owl_function_calculate_topmsg_normal(direction, curmsg, topmsg, recwinlines);
@@ -1031,7 +1034,33 @@ void owl_function_calculate_topmsg_center(int direction, owl_view_iterator *curm
   }
   owl_view_iterator_clone(topmsg, it);
 }
-  
+
+void owl_function_calculate_topmsg_bottom(int direction, owl_view_iterator *curmsg, owl_view_iterator *topmsg, int recwinlines)
+{
+  int lines;
+  owl_view_iterator *it;
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
+
+  /* Scroll up such that the curmsg is near the botton of the
+   * screen. */
+  owl_view_iterator_clone(it, curmsg);
+  lines = owl_message_get_numlines(owl_view_iterator_get_message(it));
+  for(owl_view_iterator_prev(it);
+      !owl_view_iterator_is_at_start(it);
+      owl_view_iterator_prev(it)) {
+    lines += owl_message_get_numlines(owl_view_iterator_get_message(it));
+    if (lines > recwinlines) {
+      owl_view_iterator_next(it);
+      break;
+    }
+  }
+  if (owl_view_iterator_is_at_start(it)) {
+    lines += owl_message_get_numlines(owl_view_iterator_get_message(it));
+    if (lines > recwinlines) owl_view_iterator_next(it);
+  }
+  owl_view_iterator_clone(topmsg, it);
+}
+
 void owl_function_calculate_topmsg_paged(int direction, owl_view_iterator *curmsg, owl_view_iterator *topmsg, int recwinlines, int center_on_page)
 {
   int lines;
@@ -1041,26 +1070,10 @@ void owl_function_calculate_topmsg_paged(int direction, owl_view_iterator *curms
   /* If we're off the top of the screen, scroll up such that the
    * curmsg is near the botton of the screen. */
   if (owl_view_iterator_cmp(curmsg, topmsg) < 0) {
-    owl_view_iterator_clone(it, curmsg);
-    lines = owl_message_get_numlines(owl_view_iterator_get_message(it));
-    for(owl_view_iterator_prev(it);
-        !owl_view_iterator_is_at_start(it);
-        owl_view_iterator_prev(it)) {
-      lines += owl_message_get_numlines(owl_view_iterator_get_message(it));
-      if (lines > recwinlines) {
-        owl_view_iterator_next(it);
-        break;
-      }
-    }
-    if (owl_view_iterator_is_at_start(it)) {
-      lines += owl_message_get_numlines(owl_view_iterator_get_message(it));
-      if (lines > recwinlines) owl_view_iterator_next(it);
-    }
-
     if (center_on_page)
       owl_function_calculate_topmsg_center(direction, curmsg, topmsg, recwinlines);
     else
-      owl_view_iterator_clone(topmsg, it);
+      owl_function_calculate_topmsg_bottom(direction, curmsg, topmsg, recwinlines);
     return;
   }
 
