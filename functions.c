@@ -1080,10 +1080,11 @@ void owl_function_calculate_topmsg_paged(int direction, owl_view_iterator *curms
   /* Find number of lines from top to bottom of curmsg (store in lines) */
   lines = 0;
   for (owl_view_iterator_clone(it, topmsg);
-       owl_view_iterator_cmp(it, curmsg) <= 0;
+       owl_view_iterator_cmp(it, curmsg) < 0;
        owl_view_iterator_next(it)) {
     lines += owl_message_get_numlines(owl_view_iterator_get_message(it));
   }
+  lines += owl_message_get_numlines(owl_view_iterator_get_message(curmsg));
 
   /* if we're off the bottom of the screen, scroll down */
   if (lines > recwinlines) {
