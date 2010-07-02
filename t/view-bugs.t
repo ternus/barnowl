@@ -93,3 +93,42 @@ $i1->next;
 
 ok($i1->is_at_start);
 ok($i1->is_at_end);
+
+## Bugs reallocating the message buffer
+
+# views have room to store 32k entries in the bitmap index by default, so
+# crossing that forces a reallocation.
+
+$ml->add_message(
+    BarnOwl::Message->new(
+        type => 'generic',
+        num  => 100,
+        id   => 100));
+
+$view = BarnOwl::View->new('all');
+
+$i1->init_start($view);
+while (!$i1->is_at_end) {
+    $i1->next;
+}
+
+# And a message at the end of the second page.
+
+$ml->add_message(
+    BarnOwl::Message->new(
+        type => 'generic',
+        num  => 0,
+        id   => 65500));
+
+# Iterate that message. This will create a valid range spanning most of both
+# pages.
+
+$i1->next;
+
+# Now walk backwards to verify that the newly allocated pages was properly
+# cleared.
+
+$i1->prev;
+is($i1->get_message->{id}, 65500);
+$i1->prev;
+is($i1->get_message->{id}, 100);

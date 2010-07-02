@@ -356,12 +356,16 @@ static ov_range *ov_range_find_or_insert(ov_range *v, int id)
 /* owl_view */
 static void ov_mark_message(owl_view *v, int id, bool mark)
 {
-  while (id >= v->next_cached_id) {
-    int words;
-    v->next_cached_id = ROUNDUP(v->next_cached_id * 2, sizeof (unsigned long));
-    v->messages = owl_realloc(v->messages, v->next_cached_id / sizeof(unsigned long));
-    words = v->next_cached_id / (2 * sizeof (unsigned long));
-    memset(v->messages + words, 0, words);
+  if (id >= v->next_cached_id) {
+    unsigned long old_bytes = v->next_cached_id / 8;
+    unsigned long new_bytes = old_bytes;
+    while (id >= new_bytes * 8)
+      new_bytes *= 2;
+    new_bytes = ROUNDUP(new_bytes, sizeof (unsigned long));
+
+    v->messages = owl_realloc(v->messages, new_bytes);
+    v->next_cached_id = new_bytes * 8;
+    memset((unsigned char*)v->messages + old_bytes, 0, new_bytes - old_bytes);
   }
 
   if (mark)
