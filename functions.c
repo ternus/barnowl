@@ -60,17 +60,13 @@ void owl_function_show_commands(void)
   owl_fmtext_cleanup(&fm);
 }
 
-void owl_function_show_view(const char *viewname)
+void owl_function_show_view(void)
 {
   const owl_view *v;
   owl_fmtext fm;
 
   /* we only have the one view right now */
   v=owl_global_get_current_view(&g);
-  if (viewname && strcmp(viewname, owl_view_get_name(v))) {
-    owl_function_error("No view named '%s'", viewname);
-    return;
-  }
 
   owl_fmtext_init_null(&fm);
   owl_view_to_fmtext(v, &fm);
@@ -203,12 +199,12 @@ void owl_function_adminmsg(const char *header, const char *body)
 {
   owl_message *m;
 
-  m=owl_malloc(sizeof(owl_message));
+  m=owl_message_new();
   owl_message_create_admin(m, header, body);
   
   /* add it to the global list and current view */
-  owl_messagelist_append_element(owl_global_get_msglist(&g), m);
   owl_view_consider_message(owl_global_get_current_view(&g), m);
+  owl_messagelist_append_element(owl_global_get_msglist(&g), m);
 
   /* do followlast if necessary */
   if (owl_global_should_followlast(&g)) owl_function_lastmsg_noredisplay();
@@ -230,8 +226,7 @@ owl_message *owl_function_make_outgoing_zephyr(const char *body, const char *zwr
   owl_zwrite_set_zsig(&zw, zsig);
 
   /* create the message */
-  m=owl_malloc(sizeof(owl_message));
-  
+  m=owl_message_new();
   owl_message_create_from_zwrite(m, &zw, body);
   owl_zwrite_cleanup(&zw);
 
@@ -250,29 +245,13 @@ owl_message *owl_function_make_outgoing_aim(const char *body, const char *to)
   /* error if we're not logged into aim */
   if (!owl_global_is_aimloggedin(&g)) return(NULL);
   
-  m=owl_malloc(sizeof(owl_message));
+  m=owl_message_new();
   owl_message_create_aim(m,
 			 owl_global_get_aim_screenname(&g),
 			 to,
 			 body,
 			 OWL_MESSAGE_DIRECTION_OUT,
 			 0);
-  return(m);
-}
-
-/* Create an outgoing loopback message and return a pointer to it.
- * Does not append it to the global queue, use
- * owl_global_messagequeue_addmsg() for that.
- */
-owl_message *owl_function_make_outgoing_loopback(const char *body)
-{
-  owl_message *m;
-
-  /* create the message */
-  m=owl_malloc(sizeof(owl_message));
-  owl_message_create_loopback(m, body);
-  owl_message_set_direction_out(m);
-
   return(m);
 }
 
@@ -528,19 +507,12 @@ void owl_function_loopwrite(const char *msg)
 {
   owl_message *min, *mout;
 
-  /* create a message and put it on the message queue.  This simulates
-   * an incoming message */
-  min=owl_malloc(sizeof(owl_message));
-  mout=owl_function_make_outgoing_loopback(msg);
-
   if (owl_global_is_displayoutgoing(&g)) {
+    mout=owl_message_create_loopback(msg, 1);
     owl_global_messagequeue_addmsg(&g, mout);
-  } else {
-    owl_message_delete(mout);
   }
 
-  owl_message_create_loopback(min, msg);
-  owl_message_set_direction_in(min);
+  min = owl_message_create_loopback(msg, 0);
   owl_global_messagequeue_addmsg(&g, min);
 
   /* fake a makemsg */
@@ -553,11 +525,13 @@ void owl_function_loopwrite(const char *msg)
  * if no matching messages are found.  */
 void owl_function_nextmsg_full(const char *filter, int skip_deleted, int last_if_none)
 {
-  int curmsg, i, viewsize, found;
+  int found;
   const owl_view *v;
+  owl_view_iterator *it;
   const owl_filter *f = NULL;
   const owl_message *m;
 
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
   v=owl_global_get_current_view(&g);
 
   if (filter) {
@@ -568,24 +542,21 @@ void owl_function_nextmsg_full(const char *filter, int skip_deleted, int last_if
     }
   }
 
-  curmsg=owl_global_get_curmsg(&g);
-  viewsize=owl_view_get_size(v);
+  owl_view_iterator_clone(it, owl_global_get_curmsg(&g));
   found=0;
 
-  /* just check to make sure we're in bounds... */
-  if (curmsg>viewsize-1) curmsg=viewsize-1;
-  if (curmsg<0) curmsg=0;
-
-  for (i=curmsg+1; i<viewsize; i++) {
-    m=owl_view_get_element(v, i);
+  for (owl_view_iterator_next(it);
+       !owl_view_iterator_is_at_end(it);
+       owl_view_iterator_next(it)) {
+    m = owl_view_iterator_get_message(it);
     if (skip_deleted && owl_message_is_delete(m)) continue;
     if (f && !owl_filter_message_match(f, m)) continue;
     found = 1;
     break;
   }
 
-  if (i>owl_view_get_size(v)-1) i=owl_view_get_size(v)-1;
-  if (i<0) i=0;
+  if(owl_view_iterator_is_at_end(it))
+    owl_view_iterator_prev(it);
 
   if (!found) {
     owl_function_makemsg("already at last%s message%s%s%s",
@@ -597,7 +568,7 @@ void owl_function_nextmsg_full(const char *filter, int skip_deleted, int last_if
   }
 
   if (last_if_none || found) {
-    owl_global_set_curmsg(&g, i);
+    owl_global_set_curmsg(&g, it);
     owl_function_calculate_topmsg(OWL_DIRECTION_DOWNWARDS);
     owl_mainwin_redisplay(owl_global_get_mainwin(&g));
     owl_global_set_direction_downwards(&g);
@@ -606,10 +577,13 @@ void owl_function_nextmsg_full(const char *filter, int skip_deleted, int last_if
 
 void owl_function_prevmsg_full(const char *filter, int skip_deleted, int first_if_none)
 {
-  int curmsg, i, found;
+  int found;
   const owl_view *v;
+  owl_view_iterator *it;
   const owl_filter *f = NULL;
   const owl_message *m;
+
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
 
   v=owl_global_get_current_view(&g);
 
@@ -621,21 +595,17 @@ void owl_function_prevmsg_full(const char *filter, int skip_deleted, int first_i
     }
   }
 
-  curmsg=owl_global_get_curmsg(&g);
+  owl_view_iterator_clone(it, owl_global_get_curmsg(&g));
   found=0;
 
-  /* just check to make sure we're in bounds... */
-  if (curmsg<0) curmsg=0;
-
-  for (i=curmsg-1; i>=0; i--) {
-    m=owl_view_get_element(v, i);
+  while(!owl_view_iterator_is_at_start(it)) {
+    owl_view_iterator_prev(it);
+    m = owl_view_iterator_get_message(it);
     if (skip_deleted && owl_message_is_delete(m)) continue;
     if (f && !owl_filter_message_match(f, m)) continue;
     found = 1;
     break;
   }
-
-  if (i<0) i=0;
 
   if (!found) {
     owl_function_makemsg("already at first%s message%s%s",
@@ -645,7 +615,7 @@ void owl_function_prevmsg_full(const char *filter, int skip_deleted, int first_i
   }
 
   if (first_if_none || found) {
-    owl_global_set_curmsg(&g, i);
+    owl_global_set_curmsg(&g, it);
     owl_function_calculate_topmsg(OWL_DIRECTION_UPWARDS);
     owl_mainwin_redisplay(owl_global_get_mainwin(&g));
     owl_global_set_direction_upwards(&g);
@@ -675,20 +645,17 @@ void owl_function_prevmsg_notdeleted(void)
 /* if move_after is 1, moves after the delete */
 void owl_function_deletecur(int move_after)
 {
-  int curmsg;
-  owl_view *v;
+  owl_message *m;
 
-  v=owl_global_get_current_view(&g);
+  m = owl_global_get_current_message(&g);
 
-  /* bail if there's no current message */
-  if (owl_view_get_size(v) < 1) {
+  if (m == NULL) {
     owl_function_error("No current message to delete");
     return;
   }
 
   /* mark the message for deletion */
-  curmsg=owl_global_get_curmsg(&g);
-  owl_view_delete_element(v, curmsg);
+  owl_message_mark_delete(m);
 
   if (move_after) {
     /* move the poiner in the appropriate direction 
@@ -703,26 +670,20 @@ void owl_function_deletecur(int move_after)
 
 void owl_function_undeletecur(int move_after)
 {
-  int curmsg;
-  owl_view *v;
-
-  v=owl_global_get_current_view(&g);
+  owl_message *m;
   
-  if (owl_view_get_size(v) < 1) {
+  m = owl_global_get_current_message(&g);
+
+  if (m == NULL) {
     owl_function_error("No current message to undelete");
     return;
   }
-  curmsg=owl_global_get_curmsg(&g);
 
-  owl_view_undelete_element(v, curmsg);
+  owl_message_unmark_delete(m);
 
   if (move_after) {
     if (owl_global_get_direction(&g)==OWL_DIRECTION_UPWARDS) {
-      if (curmsg>0) {
-	owl_function_prevmsg();
-      } else {
-	owl_function_nextmsg();
-      }
+      owl_function_prevmsg();
     } else {
       owl_function_nextmsg();
     }
@@ -733,31 +694,22 @@ void owl_function_undeletecur(int move_after)
 
 void owl_function_expunge(void)
 {
-  int curmsg;
-  const owl_message *m;
   owl_messagelist *ml;
-  owl_view *v;
-  int lastmsgid=0;
+  owl_view_iterator *cur;
 
-  curmsg=owl_global_get_curmsg(&g);
-  v=owl_global_get_current_view(&g);
   ml=owl_global_get_msglist(&g);
-
-  m=owl_view_get_element(v, curmsg);
-  if (m) lastmsgid = owl_message_get_id(m);
 
   /* expunge the message list */
   owl_messagelist_expunge(ml);
 
-  /* update all views (we only have one right now) */
-  owl_view_recalculate(v);
+  /*
+   * If we deleted the last message, and the point was on it, fix up
+   * the point.
+   */
+  cur = owl_global_get_curmsg(&g);
+  if(owl_view_iterator_is_at_end(cur))
+    owl_view_iterator_prev(cur);
 
-  /* find where the new position should be
-     (as close as possible to where we last where) */
-  curmsg = owl_view_get_nearest_to_msgid(v, lastmsgid);
-  if (curmsg>owl_view_get_size(v)-1) curmsg = owl_view_get_size(v)-1;
-  if (curmsg<0) curmsg = 0;
-  owl_global_set_curmsg(&g, curmsg);
   owl_function_calculate_topmsg(OWL_DIRECTION_NONE);
   /* if there are no messages set the direction to down in case we
      delete everything upwards */
@@ -769,30 +721,26 @@ void owl_function_expunge(void)
 
 void owl_function_firstmsg(void)
 {
-  owl_global_set_curmsg(&g, 0);
-  owl_global_set_topmsg(&g, 0);
+  owl_view_iterator *it;
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
+  owl_view_iterator_init_start(it, owl_global_get_current_view(&g));
+  owl_global_set_curmsg(&g, it);
+  owl_global_set_topmsg(&g, it);
   owl_mainwin_redisplay(owl_global_get_mainwin(&g));
   owl_global_set_direction_downwards(&g);
 }
 
 void owl_function_lastmsg_noredisplay(void)
 {
-  int oldcurmsg, curmsg;
   const owl_view *v;
+  owl_view_iterator *it;
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
 
   v=owl_global_get_current_view(&g);
-  oldcurmsg=owl_global_get_curmsg(&g);
-  curmsg=owl_view_get_size(v)-1;  
-  if (curmsg<0) curmsg=0;
-  owl_global_set_curmsg(&g, curmsg);
-  if (oldcurmsg < curmsg) {
-    owl_function_calculate_topmsg(OWL_DIRECTION_DOWNWARDS);
-  } else if (curmsg<owl_view_get_size(v)) {
-    /* If already at the end, blank the screen and move curmsg
-     * past the end of the messages. */
-    owl_global_set_topmsg(&g, curmsg+1);
-    owl_global_set_curmsg(&g, curmsg+1);
-  } 
+  owl_view_iterator_init_end(it, v);
+  owl_view_iterator_prev(it);
+  owl_global_set_curmsg(&g, it);
+  owl_function_calculate_topmsg(OWL_DIRECTION_UPWARDS);
   /* owl_mainwin_redisplay(owl_global_get_mainwin(&g)); */
   owl_global_set_direction_downwards(&g);
 }
@@ -997,12 +945,13 @@ void owl_function_quit(void)
 
 void owl_function_calculate_topmsg(int direction)
 {
-  int recwinlines, topmsg, curmsg;
+  int recwinlines;
+  owl_view_iterator *curmsg, *topmsg;
   const owl_view *v;
 
   v=owl_global_get_current_view(&g);
-  curmsg=owl_global_get_curmsg(&g);
-  topmsg=owl_global_get_topmsg(&g);
+  curmsg = owl_global_get_curmsg(&g);
+  topmsg = owl_global_get_topmsg(&g);
   recwinlines=owl_global_get_recwin_lines(&g);
 
   /*
@@ -1013,154 +962,190 @@ void owl_function_calculate_topmsg(int direction)
 
   switch (owl_global_get_scrollmode(&g)) {
   case OWL_SCROLLMODE_TOP:
-    topmsg = owl_function_calculate_topmsg_top(direction, v, curmsg, topmsg, recwinlines);
+    owl_function_calculate_topmsg_top(direction, curmsg, topmsg, recwinlines);
     break;
   case OWL_SCROLLMODE_NEARTOP:
-    topmsg = owl_function_calculate_topmsg_neartop(direction, v, curmsg, topmsg, recwinlines);
+    owl_function_calculate_topmsg_neartop(direction, curmsg, topmsg, recwinlines);
     break;
   case OWL_SCROLLMODE_CENTER:
-    topmsg = owl_function_calculate_topmsg_center(direction, v, curmsg, topmsg, recwinlines);
+    owl_function_calculate_topmsg_center(direction, curmsg, topmsg, recwinlines);
     break;
   case OWL_SCROLLMODE_PAGED:
-    topmsg = owl_function_calculate_topmsg_paged(direction, v, curmsg, topmsg, recwinlines, 0);
+    owl_function_calculate_topmsg_paged(direction, curmsg, topmsg, recwinlines, 0);
     break;
   case OWL_SCROLLMODE_PAGEDCENTER:
-    topmsg = owl_function_calculate_topmsg_paged(direction, v, curmsg, topmsg, recwinlines, 1);
+    owl_function_calculate_topmsg_paged(direction, curmsg, topmsg, recwinlines, 1);
+    break;
+  case OWL_SCROLLMODE_BOTTOM:
+    owl_function_calculate_topmsg_bottom(direction, curmsg, topmsg, recwinlines);
     break;
   case OWL_SCROLLMODE_NORMAL:
   default:
-    topmsg = owl_function_calculate_topmsg_normal(direction, v, curmsg, topmsg, recwinlines);
+    owl_function_calculate_topmsg_normal(direction, curmsg, topmsg, recwinlines);
   }
-  owl_function_debugmsg("Calculated a topmsg of %i", topmsg);
-  owl_global_set_topmsg(&g, topmsg);
 }
 
-/* Returns what the new topmsg should be.  
+/* Updates `topmsg' to indicate the new topmsg
  * Passed the last direction of movement, 
  * the current view,
  * the current message number in the view,
  * the top message currently being displayed,
  * and the number of lines in the recwin.
  */
-int owl_function_calculate_topmsg_top(int direction, const owl_view *v, int curmsg, int topmsg, int recwinlines)
+void owl_function_calculate_topmsg_top(int direction, owl_view_iterator *curmsg, owl_view_iterator *topmsg, int recwinlines)
 {
-  return(curmsg);
+  owl_view_iterator_clone(topmsg, curmsg);
 }
 
-int owl_function_calculate_topmsg_neartop(int direction, const owl_view *v, int curmsg, int topmsg, int recwinlines)
+void owl_function_calculate_topmsg_neartop(int direction, owl_view_iterator *curmsg, owl_view_iterator *topmsg, int recwinlines)
 {
-  if (curmsg>0 
-      && (owl_message_get_numlines(owl_view_get_element(v, curmsg-1))
-	  <  recwinlines/2)) {
-    return(curmsg-1);
-  } else {
-    return(curmsg);
+  owl_view_iterator *it;
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
+  owl_view_iterator_clone(it, curmsg);
+  owl_view_iterator_prev(it);
+  if (owl_message_get_numlines(owl_view_iterator_get_message(it))
+      <  recwinlines/2) {
+    owl_view_iterator_clone(topmsg, it);
   }
 }
   
-int owl_function_calculate_topmsg_center(int direction, const owl_view *v, int curmsg, int topmsg, int recwinlines)
+void owl_function_calculate_topmsg_center(int direction, owl_view_iterator *curmsg, owl_view_iterator *topmsg, int recwinlines)
 {
-  int i, last, lines;
+  int lines;
+  owl_view_iterator *it;
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
+  owl_view_iterator_clone(it, curmsg);
 
-  last = curmsg;
   lines = 0;
-  for (i=curmsg-1; i>=0; i--) {
-    lines += owl_message_get_numlines(owl_view_get_element(v, i));
+  for (owl_view_iterator_prev(it);
+       !owl_view_iterator_is_at_start(it);
+       owl_view_iterator_prev(it)) {
+    lines += owl_message_get_numlines(owl_view_iterator_get_message(it));
     if (lines > recwinlines/2) break;
-    last = i;
   }
-  return(last);
+  if(owl_view_iterator_is_at_start(it)) {
+    lines += owl_message_get_numlines(owl_view_iterator_get_message(it));
+    if (lines > recwinlines) owl_view_iterator_next(it);
+  }
+  owl_view_iterator_clone(topmsg, it);
 }
-  
-int owl_function_calculate_topmsg_paged(int direction, const owl_view *v, int curmsg, int topmsg, int recwinlines, int center_on_page)
+
+void owl_function_calculate_topmsg_bottom(int direction, owl_view_iterator *curmsg, owl_view_iterator *topmsg, int recwinlines)
 {
-  int i, last, lines, savey;
-  
-  /* If we're off the top of the screen, scroll up such that the 
+  int lines;
+  owl_view_iterator *it;
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
+
+  /* Scroll up such that the curmsg is near the botton of the
+   * screen. */
+  owl_view_iterator_clone(it, curmsg);
+  lines = owl_message_get_numlines(owl_view_iterator_get_message(it));
+  for(owl_view_iterator_prev(it);
+      !owl_view_iterator_is_at_start(it);
+      owl_view_iterator_prev(it)) {
+    lines += owl_message_get_numlines(owl_view_iterator_get_message(it));
+    if (lines > recwinlines) {
+      owl_view_iterator_next(it);
+      break;
+    }
+  }
+  if (owl_view_iterator_is_at_start(it)) {
+    lines += owl_message_get_numlines(owl_view_iterator_get_message(it));
+    if (lines > recwinlines) owl_view_iterator_next(it);
+  }
+  owl_view_iterator_clone(topmsg, it);
+}
+
+void owl_function_calculate_topmsg_paged(int direction, owl_view_iterator *curmsg, owl_view_iterator *topmsg, int recwinlines, int center_on_page)
+{
+  int lines;
+  owl_view_iterator *it;
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
+
+  /* If we're off the top of the screen, scroll up such that the
    * curmsg is near the botton of the screen. */
-  if (curmsg < topmsg) {
-    last = curmsg;
-    lines = 0;
-    for (i=curmsg; i>=0; i--) {
-      lines += owl_message_get_numlines(owl_view_get_element(v, i));
-      if (lines > recwinlines) break;
-    last = i;
-    }
-    if (center_on_page) {
-      return(owl_function_calculate_topmsg_center(direction, v, curmsg, 0, recwinlines));
-    } else {
-      return(last);
-    }
+  if (owl_view_iterator_cmp(curmsg, topmsg) < 0) {
+    if (center_on_page)
+      owl_function_calculate_topmsg_center(direction, curmsg, topmsg, recwinlines);
+    else
+      owl_function_calculate_topmsg_bottom(direction, curmsg, topmsg, recwinlines);
+    return;
   }
 
-  /* Find number of lines from top to bottom of curmsg (store in savey) */
-  savey=0;
-  for (i=topmsg; i<=curmsg; i++) {
-    savey+=owl_message_get_numlines(owl_view_get_element(v, i));
+  /* Find number of lines from top to bottom of curmsg (store in lines) */
+  lines = 0;
+  for (owl_view_iterator_clone(it, topmsg);
+       owl_view_iterator_cmp(it, curmsg) < 0;
+       owl_view_iterator_next(it)) {
+    lines += owl_message_get_numlines(owl_view_iterator_get_message(it));
   }
+  lines += owl_message_get_numlines(owl_view_iterator_get_message(curmsg));
 
   /* if we're off the bottom of the screen, scroll down */
-  if (savey > recwinlines) {
+  if (lines > recwinlines) {
     if (center_on_page) {
-      return(owl_function_calculate_topmsg_center(direction, v, curmsg, 0, recwinlines));
+      owl_function_calculate_topmsg_center(direction, curmsg, topmsg, recwinlines);
     } else {
-      return(curmsg);
+      owl_view_iterator_clone(topmsg, curmsg);
     }
   }
 
   /* else just stay as we are... */
-  return(topmsg);
 }
 
-int owl_function_calculate_topmsg_normal(int direction, const owl_view *v, int curmsg, int topmsg, int recwinlines)
+void owl_function_calculate_topmsg_normal(int direction, owl_view_iterator *curmsg, owl_view_iterator *topmsg, int recwinlines)
 {
-  int savey, i, foo, y;
+  int savey, lines, y;
+  owl_view_iterator *it;
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
 
-  if (curmsg<0) return(topmsg);
-    
+  if (!owl_view_iterator_is_valid(curmsg)) return;
+
   /* If we're off the top of the screen then center */
-  if (curmsg<topmsg) {
-    topmsg=owl_function_calculate_topmsg_center(direction, v, curmsg, 0, recwinlines);
+  if (owl_view_iterator_cmp(curmsg, topmsg) < 0) {
+      owl_view_iterator_clone(topmsg, curmsg);
+    owl_function_calculate_topmsg_center(direction, curmsg, topmsg, recwinlines);
   }
 
-  /* If curmsg is so far past topmsg that there are more messages than
-     lines, skip the line counting that follows because we're
-     certainly off screen.  */
-  savey=curmsg-topmsg;
-  if (savey <= recwinlines) {
-    /* Find number of lines from top to bottom of curmsg (store in savey) */
-    savey = 0;
-    for (i=topmsg; i<=curmsg; i++) {
-      savey+=owl_message_get_numlines(owl_view_get_element(v, i));
-    }
+  /* Find number of lines from top to bottom of curmsg (store in savey) */
+  savey = 0;
+  for (owl_view_iterator_clone(it, topmsg);
+       owl_view_iterator_cmp(it, curmsg) <= 0
+         /* If we ever find we're off-screen, we can stop */
+         && savey <= recwinlines
+         && !owl_view_iterator_is_at_end(it);
+       owl_view_iterator_next(it)) {
+    savey += owl_message_get_numlines(owl_view_iterator_get_message(it));
   }
 
   /* If we're off the bottom of the screen, set the topmsg to curmsg
    * and scroll upwards */
   if (savey > recwinlines) {
-    topmsg=curmsg;
-    savey=owl_message_get_numlines(owl_view_get_element(v, curmsg));
+    owl_view_iterator_clone(topmsg, curmsg);
+    savey=owl_message_get_numlines(owl_view_iterator_get_message(curmsg));
     direction=OWL_DIRECTION_UPWARDS;
   }
-  
+
   /* If our bottom line is less than 1/4 down the screen then scroll up */
   if (direction == OWL_DIRECTION_UPWARDS || direction == OWL_DIRECTION_NONE) {
     if (savey < (recwinlines / 4)) {
       y=0;
-      for (i=curmsg; i>=0; i--) {
-	foo=owl_message_get_numlines(owl_view_get_element(v, i));
-	/* will we run the curmsg off the screen? */
-	if ((foo+y) >= recwinlines) {
-	  i++;
-	  if (i>curmsg) i=curmsg;
-	  break;
-	}
-	/* have saved 1/2 the screen space? */
-	y+=foo;
-	if (y > (recwinlines / 2)) break;
+      for (owl_view_iterator_clone(it, curmsg);
+           !owl_view_iterator_is_at_start(it);
+           owl_view_iterator_prev(it)) {
+        lines = owl_message_get_numlines(owl_view_iterator_get_message(it));
+        /* will we run the curmsg off the screen? */
+        if ( lines+y >= recwinlines ) {
+          owl_view_iterator_next(it);
+          if(owl_view_iterator_cmp(it, curmsg) > 0)
+            owl_view_iterator_clone(it, curmsg);
+          break;
+        }
+        /* have saved 1/2 the screen space? */
+        y += lines;
+        if (y > (recwinlines / 2)) break;
       }
-      if (i<0) i=0;
-      return(i);
+      owl_view_iterator_clone(topmsg, it);
     }
   }
 
@@ -1169,18 +1154,18 @@ int owl_function_calculate_topmsg_normal(int direction, const owl_view *v, int c
     if (savey > ((recwinlines * 3)/4)) {
       y=0;
       /* count lines from the top until we can save 1/2 the screen size */
-      for (i=topmsg; i<curmsg; i++) {
-	y+=owl_message_get_numlines(owl_view_get_element(v, i));
-	if (y > (recwinlines / 2)) break;
+      for (owl_view_iterator_clone(it, topmsg);
+           owl_view_iterator_cmp(it, curmsg) < 0;
+           owl_view_iterator_next(it)) {
+        y+=owl_message_get_numlines(owl_view_iterator_get_message(it));
+        if (y > (recwinlines / 2)) break;
       }
-      if (i==curmsg) {
-	i--;
+      if (owl_view_iterator_cmp(it,curmsg)) {
+        owl_view_iterator_next(it);
       }
-      return(i+1);
+      owl_view_iterator_clone(topmsg, it);
     }
   }
-
-  return(topmsg);
 }
 
 void owl_function_resize(void)
@@ -1335,16 +1320,11 @@ void owl_function_info(void)
 {
   const owl_message *m;
   owl_fmtext fm, attrfm;
-  const owl_view *v;
-#ifdef HAVE_LIBZEPHYR
-  const ZNotice_t *n;
-#endif
 
   owl_fmtext_init_null(&fm);
   
-  v=owl_global_get_current_view(&g);
-  m=owl_view_get_element(v, owl_global_get_curmsg(&g));
-  if (!m || owl_view_get_size(v)==0) {
+  m=owl_global_get_current_message(&g);
+  if (!m) {
     owl_function_error("No message selected\n");
     return;
   }
@@ -1383,7 +1363,8 @@ void owl_function_info(void)
     if (owl_message_is_direction_in(m)) {
       char *ptr, tmpbuff[1024];
       int i, j, fields, len;
-
+      /* XXX TODO Display this information again*/
+      /*
       n=owl_message_get_notice(m);
 
       if (!owl_message_is_pseudo(m)) {
@@ -1410,24 +1391,31 @@ void owl_function_info(void)
 	  owl_fmtext_append_normal(&fm, "ILLEGAL VALUE\n");
 	}
       }
+      */
       owl_fmtext_appendf_normal(&fm, "  Host      : %s\n", owl_message_get_hostname(m));
 
       if (!owl_message_is_pseudo(m)) {
+        owl_fmtext_append_normal(&fm, "\n");
+        /*
+	sprintf(buff, "  Port      : %i\n", ntohs(n->z_port));
+	owl_fmtext_append_normal(&fm, buff);
+
+	owl_fmtext_append_normal(&fm,    "  Auth      : ");
+	owl_fmtext_append_normal(&fm, owl_zephyr_get_authstr(n));
 	owl_fmtext_append_normal(&fm, "\n");
-	owl_fmtext_appendf_normal(&fm, "  Port      : %i\n", ntohs(n->z_port));
-	owl_fmtext_appendf_normal(&fm, "  Auth      : %s\n", owl_zephyr_get_authstr(n));
 
-	/* FIXME make these more descriptive */
-	owl_fmtext_appendf_normal(&fm, "  Checkd Ath: %i\n", n->z_checked_auth);
-	owl_fmtext_appendf_normal(&fm, "  Multi notc: %s\n", n->z_multinotice);
-	owl_fmtext_appendf_normal(&fm, "  Num other : %i\n", n->z_num_other_fields);
-	owl_fmtext_appendf_normal(&fm, "  Msg Len   : %i\n", n->z_message_len);
+	sprintf(buff, "  Checkd Ath: %i\n", n->z_checked_auth);
+	sprintf(buff, "%s  Multi notc: %s\n", buff, n->z_multinotice);
+	sprintf(buff, "%s  Num other : %i\n", buff, n->z_num_other_fields);
+	sprintf(buff, "%s  Msg Len   : %i\n", buff, n->z_message_len);
+	owl_fmtext_append_normal(&fm, buff);
+      */
+	owl_fmtext_appendf_normal(&fm, "  Fields    : %i\n", owl_message_get_num_fields(m));
 
-	fields=owl_zephyr_get_num_fields(n);
-	owl_fmtext_appendf_normal(&fm, "  Fields    : %i\n", fields);
-
+	fields=owl_message_get_num_fields(m);
 	for (i=0; i<fields; i++) {
-	  ptr=owl_zephyr_get_field_as_utf8(n, i+1);
+
+	  ptr=owl_message_get_field(m, i+1);
 	  len=strlen(ptr);
 	  if (len<30) {
 	    strncpy(tmpbuff, ptr, len);
@@ -1446,7 +1434,8 @@ void owl_function_info(void)
 
 	  owl_fmtext_appendf_normal(&fm, "  Field %i   : %s\n", i+1, tmpbuff);
 	}
-	owl_fmtext_appendf_normal(&fm, "  Default Fm: %s\n", n->z_default_format);
+	/* owl_fmtext_append_normal(&fm, "  Default Fm:");
+           owl_fmtext_append_normal(&fm, n->z_default_format); */
       }
 
     }
@@ -1468,17 +1457,15 @@ void owl_function_info(void)
  */
 void owl_function_curmsg_to_popwin(void)
 {
-  const owl_view *v;
   const owl_message *m;
   const owl_style *s;
   owl_fmtext fm;
 
-  v=owl_global_get_current_view(&g);
   s=owl_global_get_style_by_name(&g, "default");
 
-  m=owl_view_get_element(v, owl_global_get_curmsg(&g));
+  m = owl_global_get_current_message(&g);
 
-  if (!m || owl_view_get_size(v)==0) {
+  if (!m) {
     owl_function_error("No current message");
     return;
   }
@@ -1494,20 +1481,21 @@ void owl_function_page_curmsg(int step)
 {
   /* scroll down or up within the current message IF the message is truncated */
 
-  int offset, curmsg, lines;
+  int offset, lines;
   const owl_view *v;
   owl_message *m;
 
   offset=owl_global_get_curmsg_vert_offset(&g);
   v=owl_global_get_current_view(&g);
-  curmsg=owl_global_get_curmsg(&g);
-  m=owl_view_get_element(v, curmsg);
-  if (!m || owl_view_get_size(v)==0) return;
+  m = owl_global_get_current_message(&g);
+  if (!m) return;
   lines=owl_message_get_numlines(m);
 
   if (offset==0) {
     /* Bail if the curmsg isn't the last one displayed */
-    if (curmsg != owl_mainwin_get_last_msg(owl_global_get_mainwin(&g))) {
+    owl_message *cur = owl_view_iterator_get_message(owl_mainwin_get_last_msg(owl_global_get_mainwin(&g)));
+    if (!cur
+        || (owl_message_get_id(m) != owl_message_get_id(cur))) {
       owl_function_makemsg("The entire message is already displayed");
       return;
     }
@@ -1550,16 +1538,16 @@ void owl_function_resize_typwin(int newsize)
 
 void owl_function_mainwin_pagedown(void)
 {
-  int i;
+  owl_view_iterator *iter;
+  iter = owl_view_iterator_delete_later(owl_view_iterator_new());
 
-  i=owl_mainwin_get_last_msg(owl_global_get_mainwin(&g));
-  if (i<0) return;
+  owl_view_iterator_clone(iter, owl_mainwin_get_last_msg(owl_global_get_mainwin(&g)));
+  if (!owl_view_iterator_is_valid(iter)) return;
   if (owl_mainwin_is_last_msg_truncated(owl_global_get_mainwin(&g))
-      && (owl_global_get_curmsg(&g) < i)
-      && (i>0)) {
-    i--;
+      && (owl_view_iterator_cmp(owl_global_get_curmsg(&g), iter) < 0)) {
+    owl_view_iterator_prev(iter);
   }
-  owl_global_set_curmsg(&g, i);
+  owl_global_set_curmsg(&g, iter);
   owl_function_nextmsg();
 }
 
@@ -1669,10 +1657,13 @@ void owl_function_delete_automsgs(void)
   /* mark for deletion all messages in the current view that match the
    * 'trash' filter */
 
-  int i, j, count;
+  int count;
   owl_message *m;
+  owl_view_iterator *it;
   const owl_view *v;
   const owl_filter *f;
+
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
 
   /* get the trash filter */
   f=owl_global_get_filter(&g, "trash");
@@ -1684,9 +1675,10 @@ void owl_function_delete_automsgs(void)
   v=owl_global_get_current_view(&g);
 
   count=0;
-  j=owl_view_get_size(v);
-  for (i=0; i<j; i++) {
-    m=owl_view_get_element(v, i);
+  for(owl_view_iterator_init_start(it, v);
+      !owl_view_iterator_is_at_end(it);
+      owl_view_iterator_next(it)) {
+    m = owl_view_iterator_get_message(it);
     if (owl_filter_message_match(f, m)) {
       count++;
       owl_message_mark_delete(m);
@@ -1807,55 +1799,50 @@ void owl_function_reply(int type, int enter)
   char *buff=NULL;
   const owl_message *m;
   const owl_filter *f;
-  
-  if (owl_view_get_size(owl_global_get_current_view(&g))==0) {
+
+  m = owl_global_get_current_message(&g);
+  if (!m) {
     owl_function_error("No message selected");
-  } else {
-    char *cmd;
-    
-    m=owl_view_get_element(owl_global_get_current_view(&g), owl_global_get_curmsg(&g));
-    if (!m) {
-      owl_function_error("No message selected");
-      return;
-    }
-
-    /* first check if we catch the reply-lockout filter */
-    f=owl_global_get_filter(&g, "reply-lockout");
-    if (f) {
-      if (owl_filter_message_match(f, m)) {
-	owl_function_error("Sorry, replies to this message have been disabled by the reply-lockout filter");
-	return;
-      }
-    }
-
-    /* then check if it's a question and just bring up the command prompt */
-    if (owl_message_is_question(m)) {
-      owl_function_start_command("");
-      return;
-    }
-
-    if((type == 0 &&
-        (cmd=owl_perlconfig_message_call_method(m, "replycmd", 0, NULL))) ||
-       (type == 1 &&
-        (cmd=owl_perlconfig_message_call_method(m, "replysendercmd", 0, NULL)))) {
-      buff = cmd;
-    }
-
-    if(!buff) {
-        owl_function_error("I don't know how to reply to that message.");
-        return;
-    }
-
-    if (enter) {
-      owl_history *hist = owl_global_get_cmd_history(&g);
-      owl_history_store(hist, buff);
-      owl_history_reset(hist);
-      owl_function_command_norv(buff);
-    } else {
-      owl_function_start_command(buff);
-    }
-    owl_free(buff);
+    return;
   }
+
+  /* first check if we catch the reply-lockout filter */
+  f=owl_global_get_filter(&g, "reply-lockout");
+  if (f) {
+    if (owl_filter_message_match(f, m)) {
+      owl_function_error("Sorry, replies to this message have been disabled by the reply-lockout filter");
+      return;
+    }
+  }
+
+  /* then check if it's a question and just bring up the command prompt */
+  if (owl_message_is_question(m)) {
+    owl_function_start_command("");
+    return;
+  }
+
+  char *cmd;
+  if((type == 0 &&
+      (cmd=owl_perlconfig_message_call_method(m, "replycmd", 0, NULL))) ||
+     (type == 1 &&
+      (cmd=owl_perlconfig_message_call_method(m, "replysendercmd", 0, NULL)))) {
+    buff = cmd;
+  }
+
+  if(!buff) {
+    owl_function_error("I don't know how to reply to that message.");
+    return;
+  }
+  
+  if (enter) {
+    owl_history *hist = owl_global_get_cmd_history(&g);
+    owl_history_store(hist, buff);
+    owl_history_reset(hist);
+    owl_function_command_norv(buff);
+  } else {
+    owl_function_start_command(buff);
+  }
+  owl_free(buff);
 }
 
 void owl_function_zlocate(int argc, const char *const *argv, int auth)
@@ -2013,20 +2000,20 @@ void owl_function_change_currentview_filter(const char *filtname)
 {
   owl_view *v;
   owl_filter *f;
-  int curid=-1, newpos, curmsg;
+  int curid=-1;
+  owl_view_iterator *it;
   const owl_message *curm=NULL;
+
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
 
   v=owl_global_get_current_view(&g);
 
-  curmsg=owl_global_get_curmsg(&g);
-  if (curmsg==-1) {
-    owl_function_debugmsg("Hit the curmsg==-1 case in change_view");
+  curm=owl_global_get_current_message(&g);
+  if (curm == NULL) {
+    owl_function_debugmsg("Hit the NULL curm case in change_view");
   } else {
-    curm=owl_view_get_element(v, curmsg);
-    if (curm) {
       curid=owl_message_get_id(curm);
       owl_view_save_curmsgid(v, curid);
-    }
   }
 
   f=owl_global_get_filter(&g, filtname);
@@ -2035,21 +2022,30 @@ void owl_function_change_currentview_filter(const char *filtname)
     return;
   }
 
-  owl_view_new_filter(v, f);
+  v = owl_view_new(filtname);
+  owl_global_set_current_view(&g, v);
 
   /* Figure out what to set the current message to.
    * - If the view we're leaving has messages in it, go to the closest message
    *   to the last message pointed to in that view. 
    * - If the view we're leaving is empty, try to restore the position
    *   from the last time we were in the new view.  */
-  if (curm) {
-    newpos = owl_view_get_nearest_to_msgid(v, curid);
+  if(curm == NULL) {
+    curid = owl_view_get_saved_msgid(v);
   } else {
-    newpos = owl_view_get_nearest_to_saved(v);
+    curid = owl_message_get_id(curm);
   }
 
-  owl_global_set_curmsg(&g, newpos);
-  owl_function_calculate_topmsg(OWL_DIRECTION_DOWNWARDS);
+  owl_view_iterator_init_id(it, v, curid);
+
+  if(owl_view_iterator_is_at_end(it)) {
+    owl_view_iterator_prev(it);
+  }
+
+  owl_global_set_curmsg(&g, it);
+  owl_global_set_topmsg(&g, it);
+
+  owl_function_calculate_topmsg(OWL_DIRECTION_UPWARDS);
   owl_mainwin_redisplay(owl_global_get_mainwin(&g));
   owl_global_set_direction_downwards(&g);
 }
@@ -2127,6 +2123,8 @@ void owl_function_create_filter(int argc, const char *const *argv)
 
   /* add the filter */
   owl_global_add_filter(&g, f);
+
+  owl_perlconfig_invalidate_filter(f);
 
   /* if it was in use by the current view then update */
   if (inuse) {
@@ -2444,21 +2442,29 @@ char *owl_function_typefilt(const char *type)
 void owl_function_delete_curview_msgs(int flag)
 {
   const owl_view *v;
-  int i, j;
+  owl_view_iterator *it;
+  owl_message *m;
+  int count = 0;
+
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
 
   v=owl_global_get_current_view(&g);
-  j=owl_view_get_size(v);
-  for (i=0; i<j; i++) {
+
+  for(owl_view_iterator_init_start(it, v);
+      !owl_view_iterator_is_at_end(it);
+      owl_view_iterator_next(it)) {
+    m = owl_view_iterator_get_message(it);
+    count++;
     if (flag == 1) {
-      owl_message_mark_delete(owl_view_get_element(v, i));
+      owl_message_mark_delete(m);
     } else if (flag == 0) {
-      owl_message_unmark_delete(owl_view_get_element(v, i));
+      owl_message_unmark_delete(m);
     }
   }
 
-  owl_function_makemsg("%i messages marked for %sdeletion", j, flag?"":"un");
+  owl_function_makemsg("%i messages marked for %sdeletion", count, flag?"":"un");
 
-  owl_mainwin_redisplay(owl_global_get_mainwin(&g));  
+  owl_mainwin_redisplay(owl_global_get_mainwin(&g));
 }
 
 static char *owl_function_smartfilter_cc(const owl_message *m) {
@@ -2505,16 +2511,14 @@ static char *owl_function_smartfilter_cc(const owl_message *m) {
  */
 char *owl_function_smartfilter(int type, int invert_related)
 {
-  const owl_view *v;
   const owl_message *m;
   char *zperson, *filtname=NULL;
   const char *argv[2];
   int related = owl_global_is_narrow_related(&g) ^ invert_related;
 
-  v=owl_global_get_current_view(&g);
-  m=owl_view_get_element(v, owl_global_get_curmsg(&g));
+  m = owl_global_get_current_message(&g);
 
-  if (!m || owl_view_get_size(v)==0) {
+  if (!m) {
     owl_function_error("No message selected\n");
     return(NULL);
   }
@@ -2581,15 +2585,13 @@ void owl_function_smartzpunt(int type)
 {
   /* Starts a zpunt command based on the current class,instance pair. 
    * If type=0, uses just class.  If type=1, uses instance as well. */
-  const owl_view *v;
   const owl_message *m;
   const char *cmdprefix, *mclass, *minst;
   char *cmd;
   
-  v=owl_global_get_current_view(&g);
-  m=owl_view_get_element(v, owl_global_get_curmsg(&g));
+  m = owl_global_get_current_message(&g);
 
-  if (!m || owl_view_get_size(v)==0) {
+  if (!m) {
     owl_function_error("No message selected\n");
     return;
   }
@@ -2918,49 +2920,55 @@ void owl_function_search_helper(int mode, int direction)
    */
 
   const owl_view *v;
-  int viewsize, i, curmsg, start;
+  owl_view_iterator *it;
   owl_message *m;
 
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
+
   v=owl_global_get_current_view(&g);
-  viewsize=owl_view_get_size(v);
-  curmsg=owl_global_get_curmsg(&g);
   
-  if (viewsize==0) {
+  owl_view_iterator_clone(it, owl_global_get_curmsg(&g));
+  
+  if (owl_view_is_empty(v)) {
     owl_function_error("No messages present");
     return;
   }
 
   if (mode==0) {
-    start=curmsg;
   } else if (direction==OWL_DIRECTION_DOWNWARDS) {
-    start=curmsg+1;
+    owl_view_iterator_next(it);
   } else {
-    start=curmsg-1;
+    owl_view_iterator_prev(it);
   }
 
   /* bounds check */
-  if (start>=viewsize || start<0) {
+  if ((direction==OWL_DIRECTION_DOWNWARDS
+       && owl_view_iterator_is_at_end(it))
+      ||
+      (direction==OWL_DIRECTION_UPWARDS
+       && owl_view_iterator_is_at_start(it))) {
     owl_function_error("No further matches found");
     return;
   }
 
-  for (i=start; i<viewsize && i>=0;) {
-    m=owl_view_get_element(v, i);
+  while(!owl_view_iterator_is_at_start(it)
+        && !owl_view_iterator_is_at_end(it)) {
+    m=owl_view_iterator_get_message(it);
     if (owl_message_search(m, owl_global_get_search_re(&g))) {
-      owl_global_set_curmsg(&g, i);
+      owl_global_set_curmsg(&g, it);
       owl_function_calculate_topmsg(direction);
       owl_mainwin_redisplay(owl_global_get_mainwin(&g));
       if (direction==OWL_DIRECTION_DOWNWARDS) {
-	owl_global_set_direction_downwards(&g);
+        owl_global_set_direction_downwards(&g);
       } else {
-	owl_global_set_direction_upwards(&g);
+        owl_global_set_direction_upwards(&g);
       }
       return;
     }
     if (direction==OWL_DIRECTION_DOWNWARDS) {
-      i++;
+      owl_view_iterator_next(it);
     } else {
-      i--;
+      owl_view_iterator_prev(it);
     }
     owl_function_mask_sigint(NULL);
     if(owl_global_is_interrupted(&g)) {
@@ -3111,13 +3119,17 @@ void owl_function_buddylist(int aim, int zephyr, const char *filename)
 /* Dump messages in the current view to the file 'filename'. */
 void owl_function_dump(const char *filename) 
 {
-  int i, j;
   owl_message *m;
   const owl_view *v;
+  owl_view_iterator *it;
   FILE *file;
   char *plaintext;
 
-  v=owl_global_get_current_view(&g);
+  owl_function_error("Unsupported");
+  return;
+
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
+  v = owl_global_get_current_view(&g);
 
   /* in the future make it ask yes/no */
   /*
@@ -3134,9 +3146,10 @@ void owl_function_dump(const char *filename)
     return;
   }
 
-  j=owl_view_get_size(v);
-  for (i=0; i<j; i++) {
-    m=owl_view_get_element(v, i);
+  for(owl_view_iterator_init_start(it, v);
+      !owl_view_iterator_is_at_end(it);
+      owl_view_iterator_next(it)) {
+    m = owl_view_iterator_get_message(it);
     plaintext = owl_strip_format_chars(owl_message_get_text(m));
     if (plaintext) {
       fputs(plaintext, file);
@@ -3285,14 +3298,14 @@ void owl_function_source(const char *filename)
 
 void owl_function_change_style(owl_view *v, const char *stylename)
 {
-  const owl_style *s;
+  owl_style *s;
 
   s=owl_global_get_style_by_name(&g, stylename);
   if (!s) {
     owl_function_error("No style named %s", stylename);
     return;
   }
-  owl_view_set_style(v, s);
+  owl_global_set_current_style(&g, s);
   owl_messagelist_invalidate_formats(owl_global_get_msglist(&g));
   owl_function_calculate_topmsg(OWL_DIRECTION_DOWNWARDS);
   owl_mainwin_redisplay(owl_global_get_mainwin(&g));
@@ -3304,7 +3317,7 @@ void owl_function_toggleoneline(void)
   const owl_style *s;
 
   v=owl_global_get_current_view(&g);
-  s=owl_view_get_style(v);
+  s=owl_global_get_current_style(&g);
 
   if (!owl_style_matches_name(s, "oneline")) {
     owl_function_change_style(v, "oneline");
@@ -3499,18 +3512,16 @@ void _owl_function_mark_message(const owl_message *m)
 void owl_function_mark_message(void)
 {
   const owl_message *m;
-  const owl_view *v;
 
-  v=owl_global_get_current_view(&g);
+  m = owl_global_get_current_message(&g);
 
   /* bail if there's no current message */
-  if (owl_view_get_size(v) < 1) {
+  if (!m) {
     owl_function_error("No messages to mark");
     return;
   }
 
   /* mark the message */
-  m=owl_view_get_element(v, owl_global_get_curmsg(&g));
   _owl_function_mark_message(m);
   owl_function_makemsg("Mark set");
 }
@@ -3519,7 +3530,6 @@ void owl_function_swap_cur_marked(void)
 {
   int marked_id;
   const owl_message *m;
-  const owl_view *v;
 
   marked_id=owl_global_get_markedmsgid(&g);
   if (marked_id == -1) {
@@ -3527,15 +3537,22 @@ void owl_function_swap_cur_marked(void)
     return;
   }
 
-  v=owl_global_get_current_view(&g);
-  /* bail if there's no current message */
-  if (owl_view_get_size(v) < 1) {
+  m = owl_global_get_current_message(&g);
+
+  if (!m) {
     return;
   }
 
-  m=owl_view_get_element(v, owl_global_get_curmsg(&g));
   _owl_function_mark_message(m);
-  owl_global_set_curmsg(&g, owl_view_get_nearest_to_msgid(v, marked_id));
+
+  owl_view_iterator_init_id(owl_global_get_curmsg(&g),
+                            owl_global_get_current_view(&g),
+                            marked_id);
+
+  if(owl_view_iterator_is_at_end(owl_global_get_curmsg(&g))) {
+    owl_view_iterator_prev(owl_global_get_curmsg(&g));
+  }
+
   owl_function_calculate_topmsg(OWL_DIRECTION_NONE);
   owl_mainwin_redisplay(owl_global_get_mainwin(&g));
   owl_global_set_direction_downwards(&g);

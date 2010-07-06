@@ -6,6 +6,8 @@ package BarnOwl::Hooks;
 use Carp;
 use List::Util qw(first);
 
+use BarnOwl::Commands;
+
 =head1 BarnOwl::Hooks
 
 =head1 DESCRIPTION
@@ -101,7 +103,17 @@ sub _load_perl_commands {
                            "format messages using the perl function <function_name>.\n\n" .
                            "SEE ALSO: show styles, view -s, filter -s\n\n" .
                            "DEPRECATED in favor of BarnOwl::create_style(NAME, OBJECT)",
-                          });
+                       });
+    BarnOwl::new_command(yes => \&BarnOwl::Commands::yes_command,
+                       {
+                           summary => 'Answer yes to a question',
+                           usage   => 'yes',
+                       });
+    BarnOwl::new_command(no => \&BarnOwl::Commands::no_command,
+                       {
+                           summary => 'Answer no to a question',
+                           usage   => 'no',
+                       });
     BarnOwl::new_command('edit:complete' => \&BarnOwl::Completion::do_complete,
                        {
                            summary     => "Complete the word at point",
@@ -150,6 +162,11 @@ sub _load_owlconf {
 # with compatibility by calling the old, fixed-name hooks.
 
 sub _startup {
+    for my $e (@BarnOwl::__startup_errors) {
+        BarnOwl::admin_message('Startup', $e);
+    }
+    @BarnOwl::__startup_errors = ();
+    
     _load_perl_commands();
     _load_owlconf();
 
@@ -194,6 +211,10 @@ sub _get_blist {
     my @results = grep defined, $getBuddyList->run;
     s/^\s+|\s+$//sg for (@results);
     return join("\n", grep {length($_)} @results);
+}
+
+sub _invalidate_filter {
+    my $filter = shift;
 }
 
 sub _get_quickstart {

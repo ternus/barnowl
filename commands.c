@@ -767,16 +767,6 @@ const owl_cmd commands_to_init[]
               "message <message>",
               ""),
 
-  OWLCMD_VOID("yes", owl_command_yes, OWL_CTX_RECV,
-              "Answer yes to a question",
-              "yes",
-              ""),
-
-  OWLCMD_VOID("no", owl_command_no, OWL_CTX_RECV,
-              "Answer no to a question",
-              "no",
-              ""),
-
   /****************************************************************/
   /************************* EDIT-SPECIFIC ************************/
   /****************************************************************/
@@ -2058,10 +2048,7 @@ char *owl_command_reply(int argc, const char *const *argv, const char *buff)
   } else if (argc==2 && !strcmp(argv[1], "sender")) {
     owl_function_reply(1, !edit);
   } else if (argc==2 && !strcmp(argv[1], "zaway")) {
-    const owl_message *m;
-    const owl_view    *v;
-    v = owl_global_get_current_view(&g);    
-    m = owl_view_get_element(v, owl_global_get_curmsg(&g));
+    const owl_message *m = owl_global_get_current_message(&g);
     if (m) owl_zephyr_zaway(m);
   } else {
     owl_function_makemsg("Invalid arguments to the reply command.");
@@ -2232,11 +2219,7 @@ char *owl_command_show(int argc, const char *const *argv, const char *buff)
       owl_function_show_keymap(argv[2]);
     }
   } else if (!strcmp(argv[1], "view")) {
-    if (argc==3) {
-      owl_function_show_view(argv[2]);
-    } else {
-      owl_function_show_view(NULL);
-    }
+    owl_function_show_view();
   } else if (!strcmp(argv[1], "colors")) {
     owl_function_show_colors();
   } else if (!strcmp(argv[1], "styles")) {
@@ -2606,7 +2589,7 @@ char *owl_command_getstyle(int argc, const char *const *argv, const char *buff)
     owl_function_makemsg("Wrong number of arguments for %s", argv[0]);
     return NULL;
   }
-  stylename = owl_view_get_style_name(owl_global_get_current_view(&g));
+  stylename = owl_style_get_name(owl_global_get_current_style(&g));
   if (stylename) return owl_strdup(stylename);
   return NULL;
 }
@@ -2623,74 +2606,6 @@ char *owl_command_message(int argc, const char *const *argv, const char *buff)
     buff = skiptokens(buff, 1);
     owl_function_makemsg("%s", buff);
     return NULL;
-}
-
-void owl_command_yes(void)
-{
-  owl_message *m;
-  const owl_view *v;
-  const char *cmd;
-
-  v = owl_global_get_current_view(&g);
-
-  /* bail if there's no current message */
-  if (owl_view_get_size(v) < 1) {
-    owl_function_error("No current message.");
-    return;
-  }
-
-  m = owl_view_get_element(v, owl_global_get_curmsg(&g));
-  if(!owl_message_is_question(m)) {
-    owl_function_error("That message isn't a question.");
-    return;
-  }
-  if(owl_message_is_answered(m)) {
-    owl_function_error("You already answered that question.");
-    return;
-  }
-  cmd = owl_message_get_attribute_value(m, "yescommand");
-  if(!cmd) {
-    owl_function_error("No 'yes' command!");
-    return;
-  }
-
-  owl_function_command_norv(cmd);
-  owl_message_set_isanswered(m);
-  return;
-}
-
-void owl_command_no(void)
-{
-  owl_message *m;
-  const owl_view *v;
-  const char *cmd;
-
-  v = owl_global_get_current_view(&g);
-
-  /* bail if there's no current message */
-  if (owl_view_get_size(v) < 1) {
-    owl_function_error("No current message.");
-    return;
-  }
-
-  m = owl_view_get_element(v, owl_global_get_curmsg(&g));
-  if(!owl_message_is_question(m)) {
-    owl_function_error("That message isn't a question.");
-    return;
-  }
-  if(owl_message_is_answered(m)) {
-    owl_function_error("You already answered that question.");
-    return;
-  }
-  cmd = owl_message_get_attribute_value(m, "nocommand");
-  if(!cmd) {
-    owl_function_error("No 'no' command!");
-    return;
-  }
-
-  owl_function_command_norv(cmd);
-  owl_message_set_isanswered(m);
-  return;
 }
 
 /*********************************************************************/

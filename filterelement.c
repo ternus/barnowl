@@ -3,6 +3,10 @@
 static const char * owl_filterelement_get_field(const owl_message *m, const char * field)
 {
   const char *match;
+  if (!strncmp(field, "meta:", 5)) {
+    return owl_message_get_meta(m, field+5);
+  }
+
   if (!strcasecmp(field, "class")) {
     match=owl_message_get_class(m);
   } else if (!strcasecmp(field, "instance")) {
@@ -32,14 +36,6 @@ static const char * owl_filterelement_get_field(const owl_message *m, const char
       match="none";
     } else {
       match="";
-    }
-  } else if (!strcasecmp(field, "login")) {
-    if (owl_message_is_login(m)) {
-      match="login";
-    } else if (owl_message_is_logout(m)) {
-      match="logout";
-    } else {
-      match="none";
     }
   } else {
     match = owl_message_get_attribute_value(m,field);

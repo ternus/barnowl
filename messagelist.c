@@ -1,102 +1,102 @@
+#define OWL_PERL
 #include "owl.h"
-#include <stdlib.h>
-#include <string.h>
 
-int owl_messagelist_create(owl_messagelist *ml)
-{
-  owl_list_create(&(ml->list));
-  return(0);
+owl_messagelist * owl_messagelist_new(void) {
+  return (owl_messagelist*)owl_perl_new("BarnOwl::MessageList");
 }
 
 int owl_messagelist_get_size(const owl_messagelist *ml)
 {
-  return(owl_list_get_size(&(ml->list)));
-}
-
-void *owl_messagelist_get_element(const owl_messagelist *ml, int n)
-{
-  return(owl_list_get_element(&(ml->list), n));
+  int size;
+  OWL_PERL_CALL_METHOD(ro_sv(ml), "get_size",
+                       , // No arguments
+                       // Error message
+                       "Error in get_size: %s",
+                       // Errors are fatal
+                       1,
+                       // Success code
+                       size = POPi;
+                       );
+  return size;
 }
 
 owl_message *owl_messagelist_get_by_id(const owl_messagelist *ml, int target_id)
 {
-  /* return the message with id == 'id'.  If it doesn't exist return NULL. */
-  int first, last, mid, msg_id;
-  owl_message *m;
-
-  first = 0;
-  last = owl_list_get_size(&(ml->list)) - 1;
-  while (first <= last) {
-    mid = (first + last) / 2;
-    m = owl_list_get_element(&(ml->list), mid);
-    msg_id = owl_message_get_id(m);
-    if (msg_id == target_id) {
-      return(m);
-    } else if (msg_id < target_id) {
-      first = mid + 1;
-    } else {
-      last = mid - 1;
-    }
-  }
-  return(NULL);
+  SV *msg;
+  OWL_PERL_CALL_METHOD(ro_sv(ml), "get_by_id",
+                       mXPUSHi(target_id); ,
+                       // Error
+                       "Error in get_by_id: %s",
+                       1, //Fatal errors
+                       msg = POPs;
+                       if(SvROK(msg)) SvREFCNT_inc(msg);
+                       );
+  return SvROK(msg) ? sv_2mortal(msg) : NULL;
 }
 
-int owl_messagelist_append_element(owl_messagelist *ml, void *element)
+void owl_messagelist_append_element(owl_messagelist *ml, owl_message *msg)
 {
-  return(owl_list_append_element(&(ml->list), element));
+  OWL_PERL_CALL_METHOD(ml, "add_message",
+                       XPUSHs((SV*)msg); ,
+                       // Error
+                       "Error in add_message: %s",
+                       1, // Fatal
+                       OWL_PERL_VOID_CALL
+                       );
+  // When we insert the message, perl code takes ownership of it, so
+  // we relinquish our reference
+  sv_2mortal(msg);
 }
 
-/* do we really still want this? */
-int owl_messagelist_delete_element(owl_messagelist *ml, int n)
+void owl_messagelist_expunge(owl_messagelist *ml)
 {
-  /* mark a message as deleted */
-  owl_message_mark_delete(owl_list_get_element(&(ml->list), n));
-  return(0);
+  OWL_PERL_CALL_METHOD(ml, "expunge",
+                       , // No args
+                       // Error
+                       "Error in expunge: %s",
+                       1, // Fatal
+                       OWL_PERL_VOID_CALL
+                       );
 }
 
-int owl_messagelist_undelete_element(owl_messagelist *ml, int n)
+void owl_messagelist_iterate_begin(owl_message *ml, int pos, bool reverse)
 {
-  /* mark a message as deleted */
-  owl_message_unmark_delete(owl_list_get_element(&(ml->list), n));
-  return(0);
+  OWL_PERL_CALL_METHOD(ml, "iterate_begin",
+                       mXPUSHi(pos);
+                       mXPUSHi(reverse);,
+                       // Error
+                       "Error in iterate_begin: %s",
+                       1, // Fatal
+                       OWL_PERL_VOID_CALL
+                       );
 }
 
-int owl_messagelist_expunge(owl_messagelist *ml)
+owl_message* owl_messagelist_iterate_next(owl_message *ml)
 {
-  /* expunge deleted messages */
-  int i, j;
-  owl_list newlist;
-  owl_message *m;
+  SV *msg;
+  OWL_PERL_CALL_METHOD(ml, "iterate_next",
+                       /* no args */,
+                       // Error
+                       "Error in iterate_next: %s",
+                       1, // Fatal
+                       msg = POPs;
+                       if(SvROK(msg)) SvREFCNT_inc(msg);
+                       );
+  return SvROK(msg) ? sv_2mortal(msg) : NULL;
+}
 
-  owl_list_create(&newlist);
-  /*create a new list without messages marked as deleted */
-  j=owl_list_get_size(&(ml->list));
-  for (i=0; i<j; i++) {
-    m=owl_list_get_element(&(ml->list), i);
-    if (owl_message_is_delete(m)) {
-      owl_message_delete(m);
-    } else {
-      owl_list_append_element(&newlist, m);
-    }
-  }
-
-  /* free the old list */
-  owl_list_cleanup(&(ml->list), NULL);
-
-  /* copy the new list to the old list */
-  ml->list = newlist;
-
-  return(0);
+void owl_messagelist_iterate_done(owl_message *ml)
+{
+  OWL_PERL_CALL_METHOD(ml, "iterate_done",
+                       /* no args */,
+                       // Error
+                       "Error in iterate_done: %s",
+                       1, // Fatal
+                       OWL_PERL_VOID_CALL
+                       );
 }
 
 void owl_messagelist_invalidate_formats(const owl_messagelist *ml)
 {
-  int i, j;
-  owl_message *m;
-
-  j=owl_list_get_size(&(ml->list));
-  for (i=0; i<j; i++) {
-    m=owl_list_get_element(&(ml->list), i);
-    owl_message_invalidate_format(m);
-  }
+  owl_global_next_fmtext_seq(&g);
 }

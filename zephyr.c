@@ -1418,10 +1418,12 @@ static int _owl_zephyr_process_events(void)
       }
 
       /* create the new message */
-      m=owl_malloc(sizeof(owl_message));
+      m=owl_message_new();
       owl_message_create_from_znotice(m, &notice);
 
       owl_global_messagequeue_addmsg(&g, m);
+
+      ZFreeNotice(&notice);
     }
   }
 #endif

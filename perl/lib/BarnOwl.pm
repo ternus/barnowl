@@ -37,6 +37,7 @@ use BarnOwl::Timer;
 use BarnOwl::Editwin;
 use BarnOwl::Completion;
 use BarnOwl::Help;
+use BarnOwl::MessageList;
 
 use List::Util qw(max);
 
@@ -234,6 +235,7 @@ changed how a style renders messages.
 # switch, if present.
 our $configfile;
 
+our @__startup_errors = ();
 our @all_commands;
 
 if(!$configfile && -f $ENV{HOME} . "/.barnowlconf") {

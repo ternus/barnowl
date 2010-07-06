@@ -148,37 +148,6 @@ void owl_start_curses(void) {
   owl_start_color();
 }
 
-static void owl_setup_default_filters(void)
-{
-  int i;
-  static const struct {
-    const char *name;
-    const char *desc;
-  } filters[] = {
-    { "personal",
-      "isprivate ^true$ and ( not type ^zephyr$ or ( class ^message  ) )" },
-    { "trash",
-      "class ^mail$ or opcode ^ping$ or type ^admin$ or ( not login ^none$ )" },
-    { "wordwrap", "not ( type ^admin$ or type ^zephyr$ )" },
-    { "ping", "opcode ^ping$" },
-    { "auto", "opcode ^auto$" },
-    { "login", "not login ^none$" },
-    { "reply-lockout", "class ^noc or class ^mail$" },
-    { "out", "direction ^out$" },
-    { "aim", "type ^aim$" },
-    { "zephyr", "type ^zephyr$" },
-    { "none", "false" },
-    { "all", "true" },
-    { NULL, NULL }
-  };
-
-  owl_function_debugmsg("startup: creating default filters");
-
-  for (i = 0; filters[i].name != NULL; i++)
-    owl_global_add_filter(&g, owl_filter_new_fromstring(filters[i].name,
-                                                        filters[i].desc));
-}
-
 /*
  * Process a new message passed to us on the message queue from some
  * protocol. This includes adding it to the message list, updating the
@@ -428,7 +397,7 @@ int stderr_replace(void)
 void stderr_redirect_handler(const owl_io_dispatch *d, void *data)
 {
   int navail, bread;
-  char buf[4096];
+  char *buf;
   int rfd = d->fd;
   char *err;
 
@@ -437,16 +406,17 @@ void stderr_redirect_handler(const owl_io_dispatch *d, void *data)
     return;
   }
   /*owl_function_debugmsg("stderr_redirect: navail = %d\n", navail);*/
-  if (navail <= 0) return;
-  if (navail > sizeof(buf)-1) {
-    navail = sizeof(buf)-1;
-  }
+  if (navail<=0) return;
+  /* if (navail>256) { navail = 256; } */
+  buf = owl_malloc(navail+1);
+
   bread = read(rfd, buf, navail);
   if (buf[navail-1] != '\0') {
     buf[navail] = '\0';
   }
 
   err = owl_sprintf("[stderr]\n%s", buf);
+  owl_free(buf);
 
   owl_function_log_err(err);
   owl_free(err);
@@ -469,7 +439,7 @@ int main(int argc, char **argv, char **env)
   int argcsave;
   const char *const *argvsave;
   char *perlout, *perlerr;
-  const owl_style *s;
+  owl_style *s;
   const char *dir;
   owl_options opts;
 
@@ -543,13 +513,13 @@ int main(int argc, char **argv, char **env)
 
   owl_global_complete_setup(&g);
 
-  owl_setup_default_filters();
+  owl_global_setup_default_filters(&g);
 
   /* set the current view */
   owl_function_debugmsg("startup: setting the current view");
-  owl_view_create(owl_global_get_current_view(&g), "main",
-                  owl_global_get_filter(&g, "all"),
-                  owl_global_get_style_by_name(&g, "default"));
+  g.current_view = owl_view_new("all");
+  owl_global_set_current_style(&g, owl_global_get_style_by_name(&g, "default"));
+  owl_function_firstmsg();
 
   /* AIM init */
   owl_function_debugmsg("startup: doing AIM initialization");
@@ -561,6 +531,7 @@ int main(int argc, char **argv, char **env)
   if (perlout) owl_free(perlout);
 
   /* welcome message */
+  if(owl_messagelist_get_size(owl_global_get_msglist(&g)) == 0) {
   owl_function_debugmsg("startup: creating splash message");
   owl_function_adminmsg("",
     "-----------------------------------------------------------------------\n"
@@ -573,6 +544,7 @@ int main(int argc, char **argv, char **env)
     "Please report any bugs or suggestions to bug-barnowl@mit.edu    (   )  \n"
     "-----------------------------------------------------------------m-m---\n"
   );
+  }
 
   /* process the startup file */
   owl_function_debugmsg("startup: processing startup file");
@@ -589,7 +561,7 @@ int main(int argc, char **argv, char **env)
   owl_function_debugmsg("startup: set style for the view: %s", owl_global_get_default_style(&g));
   s = owl_global_get_style_by_name(&g, owl_global_get_default_style(&g));
   if(s)
-      owl_view_set_style(owl_global_get_current_view(&g), s);
+      owl_global_set_current_style(&g, s);
   else
       owl_function_error("No such style: %s", owl_global_get_default_style(&g));
 
@@ -600,10 +572,13 @@ int main(int argc, char **argv, char **env)
 
   owl_select_add_pre_select_action(owl_refresh_pre_select_action, NULL, NULL);
   owl_select_add_pre_select_action(owl_process_messages, NULL, NULL);
+  owl_select_add_pre_select_action(owl_view_iterator_delayed_delete, NULL, NULL);
 
   owl_function_debugmsg("startup: entering main loop");
   /* main loop */
   while (1) {
+    owl_perl_savetmps();
+
     /* select on FDs we know about. */
     owl_select();
 
@@ -618,5 +593,6 @@ int main(int argc, char **argv, char **env)
       }
     }
 
+    owl_perl_freetmps();
   }
 }

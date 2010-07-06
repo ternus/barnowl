@@ -475,7 +475,7 @@ sub process_msg {
 	    body        => $body,
 	    sender      => $conn->nick,
 	    is_private($to) ?
-	      (isprivate  => 'true') : (channel => $to),
+	      (private  => 'true') : (channel => $to),
 	    replycmd    => BarnOwl::quote('irc-msg',  '-a', $conn->alias, $to),
 	    replysendercmd => BarnOwl::quote('irc-msg', '-a', $conn->alias, $to),
 	);

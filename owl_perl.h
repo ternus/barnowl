@@ -37,6 +37,7 @@
     } \
     if (SvTRUE(ERRSV)) { \
       if(fatalp) { \
+        endwin();                       \
         printf(err, SvPV_nolen(ERRSV)); \
         exit(-1); \
       } else { \
@@ -50,6 +51,16 @@
     PUTBACK; \
     FREETMPS; \
     LEAVE; \
+}
+
+extern int endwin(void);
+
+/*
+ * There's no way to enforce constness into perlspace, so we use this
+ * to cast for operations that are known to be constant.
+ */
+static inline SV * ro_sv(const SV* sv) {
+  return (SV*) sv;
 }
 
 #endif /* INC_PERL_PERL_H */

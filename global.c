@@ -40,9 +40,6 @@ void owl_global_init(owl_global *g) {
 
   g->context_stack = NULL;
   owl_global_push_context(g, OWL_CTX_STARTUP, NULL, NULL, NULL);
-
-  g->curmsg=0;
-  g->topmsg=0;
   g->markedmsgid=-1;
   g->startupargs=NULL;
 
@@ -93,8 +90,6 @@ void owl_global_init(owl_global *g) {
   owl_global_set_confdir(g, cd);
   owl_free(cd);
 
-  owl_messagelist_create(&(g->msglist));
-
   _owl_global_init_windows(g);
 
   g->aim_screenname=NULL;
@@ -120,6 +115,8 @@ void owl_global_init(owl_global *g) {
   owl_list_create(&(g->psa_list));
   g->timerlist = NULL;
   g->interrupted = FALSE;
+
+  g->fmtext_seq = 0;
 }
 
 static void _owl_global_init_windows(owl_global *g)
@@ -127,8 +124,12 @@ static void _owl_global_init_windows(owl_global *g)
   /* Create the main window */
   owl_mainpanel_init(&(g->mainpanel));
 
-  /* Create the widgets */
-  owl_mainwin_init(&(g->mw), g->mainpanel.recwin);
+  /* Create the widgets:
+   * owl_mainwin_init is called later after perl exists.
+   *
+   * TODO: we probably want to postpone initing all windows until after perl
+   * exists.
+   */
   owl_popwin_init(&(g->pw));
   owl_msgwin_init(&(g->msgwin), g->mainpanel.msgwin);
   owl_sepbar_init(g->mainpanel.sepwin);
@@ -150,6 +151,10 @@ void owl_global_sepbar_dirty(owl_global *g)
 /* Called once perl has been initialized */
 void owl_global_complete_setup(owl_global *g)
 {
+  owl_mainwin_init(&(g->mw), g->mainpanel.recwin);
+  g->msglist = owl_messagelist_new();
+  g->curmsg = owl_view_iterator_new();
+  g->topmsg = owl_view_iterator_new();
   owl_cmddict_setup(&(g->cmds));
 }
 
@@ -236,12 +241,12 @@ int owl_global_get_recwin_lines(const owl_global *g) {
 
 /* curmsg */
 
-int owl_global_get_curmsg(const owl_global *g) {
-  return(g->curmsg);
+owl_view_iterator* owl_global_get_curmsg(const owl_global *g) {
+  return g->curmsg;
 }
 
-void owl_global_set_curmsg(owl_global *g, int i) {
-  g->curmsg=i;
+void owl_global_set_curmsg(owl_global *g, owl_view_iterator *it) {
+  owl_view_iterator_clone(g->curmsg, it);
   /* we will reset the vertical offset from here */
   /* we might want to move this out to the functions later */
   owl_global_set_curmsg_vert_offset(g, 0);
@@ -249,12 +254,16 @@ void owl_global_set_curmsg(owl_global *g, int i) {
 
 /* topmsg */
 
-int owl_global_get_topmsg(const owl_global *g) {
-  return(g->topmsg);
+owl_view_iterator* owl_global_get_topmsg(const owl_global *g) {
+  return g->topmsg;
 }
 
-void owl_global_set_topmsg(owl_global *g, int i) {
-  g->topmsg=i;
+void owl_global_set_topmsg(owl_global *g, owl_view_iterator *it) {
+  if(!it) {
+    owl_view_iterator_invalidate(g->topmsg);
+  } else {
+    owl_view_iterator_clone(g->topmsg, it);
+  }
 }
 
 /* markedmsgid */
@@ -288,7 +297,7 @@ owl_popwin *owl_global_get_popwin(owl_global *g) {
 /* msglist */
 
 owl_messagelist *owl_global_get_msglist(owl_global *g) {
-  return(&(g->msglist));
+  return g->msglist;
 }
 
 /* keyhandler */
@@ -628,7 +637,26 @@ int owl_global_get_nextmsgid(owl_global *g) {
 /* current view */
 
 owl_view *owl_global_get_current_view(owl_global *g) {
-  return(&(g->current_view));
+  return(g->current_view);
+}
+
+void owl_global_set_current_view(owl_global *g, owl_view *v) {
+  owl_view_delete(g->current_view);
+  g->current_view = v;
+}
+
+void owl_global_set_current_style(owl_global *g, owl_style *s) {
+  g->current_style = s;
+}
+
+owl_style *owl_global_get_current_style(owl_global *g) {
+  return g->current_style;
+}
+
+owl_message *owl_global_get_current_message(owl_global *g) {
+  owl_view *cur = owl_global_get_current_view(g);
+  if(owl_view_is_empty(cur)) return NULL;
+  return owl_view_iterator_get_message(owl_global_get_curmsg(g));
 }
 
 /* has colors */
@@ -668,12 +696,16 @@ int owl_global_message_is_puntable(owl_global *g, const owl_message *m) {
 
 int owl_global_should_followlast(owl_global *g) {
   const owl_view *v;
-  
+  owl_view_iterator *it;
+
   if (!owl_global_is__followlast(g)) return(0);
-  
+
   v=owl_global_get_current_view(g);
-  
-  if (owl_global_get_curmsg(g)==owl_view_get_size(v)-1) return(1);
+  it = owl_view_iterator_delete_later(owl_view_iterator_new());
+  owl_view_iterator_clone(it, owl_global_get_curmsg(g));
+  owl_view_iterator_next(it);
+
+  if (owl_view_iterator_is_at_end(it)) return(1);
   return(0);
 }
 
@@ -812,7 +844,7 @@ owl_buddylist *owl_global_get_buddylist(owl_global *g)
 
 /* Return the style with name 'name'.  If it does not exist return
  * NULL */
-const owl_style *owl_global_get_style_by_name(const owl_global *g, const char *name)
+owl_style *owl_global_get_style_by_name(const owl_global *g, const char *name)
 {
   return owl_dict_find_element(&(g->styledict), name);
 }
@@ -829,10 +861,10 @@ void owl_global_add_style(owl_global *g, owl_style *s)
    * If we're redefining the current style, make sure to update
    * pointers to it.
    */
-  if(g->current_view.style
-     && !strcmp(owl_style_get_name(g->current_view.style),
+  if(g->current_style
+     && !strcmp(owl_style_get_name(g->current_style),
                 owl_style_get_name(s)))
-    g->current_view.style = s;
+    g->current_style = s;
   owl_dict_insert_element(&(g->styledict), owl_style_get_name(s),
                           s, (void (*)(void *))owl_style_delete);
 }
@@ -953,4 +985,52 @@ void owl_global_set_interrupted(owl_global *g) {
 
 void owl_global_unset_interrupted(owl_global *g) {
   g->interrupted = 0;
+}
+
+void owl_global_setup_default_filters(owl_global *g)
+{
+  int i;
+  static const struct {
+    const char *name;
+    const char *desc;
+  } filters[] = {
+    { "personal",
+      "private ^true$ and ( not type ^zephyr$ or ( class ^message  ) )" },
+    { "trash",
+      "class ^mail$ or opcode ^ping$ or type ^admin$ or ( not login ^none$ )" },
+    { "wordwrap", "not ( type ^admin$ or type ^zephyr$ )" },
+    { "ping", "opcode ^ping$" },
+    { "auto", "opcode ^auto$" },
+    { "login", "not login ^none$" },
+    { "reply-lockout", "class ^noc or class ^mail$" },
+    { "out", "direction ^out$" },
+    { "aim", "type ^aim$" },
+    { "zephyr", "type ^zephyr$" },
+    { "none", "false" },
+    { "all", "true" },
+    { NULL, NULL }
+  };
+
+  owl_function_debugmsg("startup: creating default filters");
+
+  for (i = 0; filters[i].name != NULL; i++)
+    owl_global_add_filter(g, owl_filter_new_fromstring(filters[i].name,
+                                                       filters[i].desc));
+}
+
+/*
+ * The fmtext_seq is used to manage the fmtext cache for
+ * messages. Whenever we initialize a cache, we save the global seq in
+ * the cache. Whenever we change styles, we increment the global
+ * seq. Caches are checked to ensure that their sequence number
+ * matches the global sequence whenever they are used.
+ */
+int owl_global_get_fmtext_seq(owl_global *g)
+{
+    return g->fmtext_seq;
+}
+
+void owl_global_next_fmtext_seq(owl_global *g)
+{
+    g->fmtext_seq++;
 }

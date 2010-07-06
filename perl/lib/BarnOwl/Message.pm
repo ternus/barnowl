@@ -9,13 +9,80 @@ use BarnOwl::Message::Generic;
 use BarnOwl::Message::Loopback;
 use BarnOwl::Message::Zephyr;
 
+use POSIX qw(ctime);
+
 sub new {
     my $class = shift;
-    my %args = (@_);
+    my $time = time;
+    my $timestr = ctime($time);
+    $timestr =~ s/\n$//;
+    my %args = (
+        __meta    => {deleted => 0},
+        time      => $timestr,
+        unix_time => $time,
+        login     => 'none',
+        direction => 'none',
+        @_);
+    unless(exists($args{id})) {
+        my $msglist = BarnOwl::message_list();
+        $args{id} = $msglist->next_id;
+    }
+    if(exists $args{loginout}) {
+        $args{login} = $args{loginout};
+        delete $args{loginout};
+    }
+    if (exists $args{private}) {
+        $args{private} = $args{private}?'true':'false';
+    }
     if($class eq __PACKAGE__ && $args{type}) {
         $class = "BarnOwl::Message::" . ucfirst $args{type};
     }
     return bless {%args}, $class;
+}
+
+sub lock_message {
+    my $self = shift;
+    for my $k (keys %$self) {
+        if($k !~ /^_/) {
+            Internals::SvREADONLY $self->{$k}, 1;
+        }
+    }
+}
+
+sub __set_attribute {
+    my $self = shift;
+    my $attr = shift;
+    my $val  = shift;
+    $self->{$attr} = $val;
+}
+
+sub __format_attributes {
+    my $self = shift;
+    my %skip = map {$_ => 1} qw(unix_time fields id __meta __fmtext type);
+    my $text = "";
+    my @keys = sort keys %$self;
+    for my $k (@keys) {
+        my $v = $self->{$k};
+        unless($skip{$k}) {
+            $text .= sprintf("  %-15.15s: %-35.35s\n", $k, $v);
+        }
+    }
+    return $text;
+}
+
+sub set_meta {
+    my $self = shift;
+    my $key = shift;
+    my $val = shift;
+    $self->{__meta}{$key} = $val;
+    undef $self->{__fmtext};
+    BarnOwl::View->consider_message($self);
+}
+
+sub get_meta {
+    my $self = shift;
+    my $key  = shift;
+    return $self->{__meta}{$key};
 }
 
 sub type        { return shift->{"type"}; }
@@ -35,7 +102,7 @@ sub is_loginout { my $m=shift; return ($m->is_login or $m->is_logout); }
 sub is_incoming { return (shift->{"direction"} eq "in"); }
 sub is_outgoing { return (shift->{"direction"} eq "out"); }
 
-sub is_deleted  { return shift->{"deleted"}; }
+sub is_deleted  { return shift->get_meta("deleted"); }
 
 sub is_admin    { return (shift->{"type"} eq "admin"); }
 sub is_generic  { return (shift->{"type"} eq "generic"); }
@@ -81,13 +148,20 @@ sub personal_context { return ""; }
 sub short_personal_context { return ""; }
 
 sub delete {
-    my ($m) = @_;
-    &BarnOwl::command("delete --id ".$m->id);
+    my $self = shift;
+    $self->set_meta(deleted => 1);
+    BarnOwl::message_list()->set_attribute($self => deleted => 1);
 }
 
 sub undelete {
-    my ($m) = @_;
-    &BarnOwl::command("undelete --id ".$m->id);
+    my $self = shift;
+    $self->set_meta(deleted => 0);
+    BarnOwl::message_list()->set_attribute($self => deleted => 0);
+}
+
+sub is_question {
+    my $self = shift;
+    return $self->is_admin && defined($self->{question});
 }
 
 # Serializes the message into something similar to the zwgc->vt format

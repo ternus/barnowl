@@ -1113,11 +1113,11 @@ sub process_presence_available {
 
     if ($type eq '' || $type eq 'available') {
         $props{body} = "$from is now online. ";
-        $props{loginout} = 'login';
+        $props{login} = 'login';
     }
     else {
         $props{body} = "$from is now offline. ";
-        $props{loginout} = 'logout';
+        $props{login} = 'logout';
     }
     BarnOwl::queue_message(BarnOwl::Message->new(%props));
 }
@@ -1260,7 +1260,7 @@ sub j2hash {
           . $props{error};
     }
     else { # chat, or normal (default)
-        $props{private} = 1;
+        $props{private} = 'true';
 
         my $connection;
         if ($dir eq 'in') {

@@ -123,9 +123,9 @@ typedef void HV;
 #define OWL_PROTOCOL_YAHOO          4
 #define OWL_PROTOCOL_MSN            5
 
-#define OWL_MESSAGE_DIRECTION_NONE  0
-#define OWL_MESSAGE_DIRECTION_IN    1
-#define OWL_MESSAGE_DIRECTION_OUT   2
+#define OWL_MESSAGE_DIRECTION_NONE  "none"
+#define OWL_MESSAGE_DIRECTION_IN    "in"
+#define OWL_MESSAGE_DIRECTION_OUT   "out"
 
 #define OWL_IO_READ   1
 #define OWL_IO_WRITE  2
@@ -145,6 +145,7 @@ typedef void HV;
 #define OWL_SCROLLMODE_CENTER      3
 #define OWL_SCROLLMODE_PAGED       4
 #define OWL_SCROLLMODE_PAGEDCENTER 5
+#define OWL_SCROLLMODE_BOTTOM      6
 
 #define OWL_TAB               3  /* This *HAS* to be the size of TABSTR below */
 #define OWL_TABSTR        "   "
@@ -213,8 +214,13 @@ typedef void HV;
 #define OWL_ENABLE_ZCRYPT 1
 #endif
 
+#define OWL_ITERATE_FORWARD     0
+#define OWL_ITERATE_REVERSE     1
+
 #define OWL_META(key) ((key)|010000)
 /* OWL_CTRL is definied in kepress.c */
+
+#define ROUNDUP(x,n) (((x)+((n)-1))&(~((n)-1)))
 
 #define LINE 2048
 
@@ -290,6 +296,7 @@ typedef struct _owl_list {
   int size;
   int avail;
   void **list;
+  void **alloc;
 } owl_list;
 
 typedef struct _owl_dict_el {
@@ -365,39 +372,21 @@ typedef struct _owl_pair {
 
 struct _owl_fmtext_cache;
 
-typedef struct _owl_message {
-  int id;
-  int direction;
-#ifdef HAVE_LIBZEPHYR
-  ZNotice_t notice;
-#endif
-  struct _owl_fmtext_cache * fmtext;
-  int delete;
-  const char *hostname;
-  owl_list attributes;            /* this is a list of pairs */
-  char *timestr;
-  time_t time;
-} owl_message;
+typedef SV owl_message;
 
 #define OWL_FMTEXT_CACHE_SIZE 1000
 /* We cache the saved fmtexts for the last bunch of messages we
    rendered */
 typedef struct _owl_fmtext_cache {
-    owl_message * message;
-    owl_fmtext fmtext;
+  int message_id;
+  int seq;
+  owl_fmtext fmtext;
 } owl_fmtext_cache;
 
 typedef struct _owl_style {
   char *name;
   SV *perlobj;
 } owl_style;
-
-typedef struct _owl_mainwin {
-  int curtruncated;
-  int lasttruncated;
-  int lastdisplayed;
-  owl_window *window;
-} owl_mainwin;
 
 typedef struct _owl_viewwin {
   owl_fmtext fmtext;
@@ -422,9 +411,7 @@ typedef struct _owl_msgwin {
   gulong redraw_id;
 } owl_msgwin;
 
-typedef struct _owl_messagelist {
-  owl_list list;
-} owl_messagelist;
+typedef SV owl_messagelist;
 
 typedef struct _owl_regex {
   int negate;
@@ -451,13 +438,15 @@ typedef struct _owl_filter {
   int bgcolor;
 } owl_filter;
 
-typedef struct _owl_view {
-  char *name;
-  owl_filter *filter;
-  owl_messagelist ml;
-  const owl_style *style;
-  int cachedmsgid;
-} owl_view;
+typedef struct _owl_view owl_view;
+typedef struct _owl_view_iterator owl_view_iterator;
+
+typedef struct _owl_mainwin {
+  int curtruncated;
+  int lasttruncated;
+  owl_view_iterator *lastdisplayed;
+  owl_window *window;
+} owl_mainwin;
 
 typedef struct _owl_history {
   owl_list hist;
@@ -579,11 +568,12 @@ typedef struct _owl_global {
   GList *context_stack;
   owl_errqueue errqueue;
   int lines, cols;
-  int curmsg, topmsg;
+  owl_view_iterator *curmsg, *topmsg;
   int markedmsgid;              /* for finding the marked message when it has moved. */
   int curmsg_vert_offset;
-  owl_view current_view;
-  owl_messagelist msglist;
+  owl_view *current_view;
+  owl_style *current_style;
+  owl_messagelist *msglist;
   WINDOW *input_pad;
   owl_mainpanel mainpanel;
   gulong typwin_erase_id;
@@ -642,6 +632,7 @@ typedef struct _owl_global {
   owl_timer *aim_nop_timer;
   int load_initial_subs;
   volatile sig_atomic_t interrupted;
+  int fmtext_seq;          /* Used to invalidate message fmtext caches */
 } owl_global;
 
 /* globals */

@@ -11,7 +11,7 @@ extern XS(boot_BarnOwl);
 extern XS(boot_DynaLoader);
 /* extern XS(boot_DBI); */
 
-static void owl_perl_xs_init(pTHX)
+void owl_perl_xs_init(pTHX) /* noproto */
 {
   const char *file = __FILE__;
   dXSUB_SYS;
@@ -75,175 +75,21 @@ HV *owl_new_hv(const owl_dict *d, SV *(*to_sv)(const void *))
 
 SV *owl_perlconfig_message2hashref(const owl_message *m)
 {
-  HV *h, *stash;
-  SV *hr;
-  const char *type;
-  char *ptr, *utype, *blessas;
-  int i, j;
-  const owl_pair *pair;
-  const owl_filter *wrap;
-
-  if (!m) return &PL_sv_undef;
-  wrap = owl_global_get_filter(&g, "wordwrap");
-  if(!wrap) {
-      owl_function_error("wrap filter is not defined");
-      return &PL_sv_undef;
-  }
-
-  h = newHV();
-
-#define MSG2H(h,field) (void)hv_store(h, #field, strlen(#field),        \
-                                      owl_new_sv(owl_message_get_##field(m)), 0)
-
-  if (owl_message_is_type_zephyr(m)
-      && owl_message_is_direction_in(m)) {
-    /* Handle zephyr-specific fields... */
-    AV *av_zfields;
-
-    av_zfields = newAV();
-    j=owl_zephyr_get_num_fields(owl_message_get_notice(m));
-    for (i=0; i<j; i++) {
-      ptr=owl_zephyr_get_field_as_utf8(owl_message_get_notice(m), i+1);
-      av_push(av_zfields, owl_new_sv(ptr));
-      owl_free(ptr);
-    }
-    (void)hv_store(h, "fields", strlen("fields"), newRV_noinc((SV*)av_zfields), 0);
-
-    (void)hv_store(h, "auth", strlen("auth"), 
-                   owl_new_sv(owl_zephyr_get_authstr(owl_message_get_notice(m))),0);
-  }
-
-  j=owl_list_get_size(&(m->attributes));
-  for(i=0; i<j; i++) {
-    pair=owl_list_get_element(&(m->attributes), i);
-    (void)hv_store(h, owl_pair_get_key(pair), strlen(owl_pair_get_key(pair)),
-                   owl_new_sv(owl_pair_get_value(pair)),0);
-  }
-  
-  MSG2H(h, type);
-  MSG2H(h, direction);
-  MSG2H(h, class);
-  MSG2H(h, instance);
-  MSG2H(h, sender);
-  MSG2H(h, realm);
-  MSG2H(h, recipient);
-  MSG2H(h, opcode);
-  MSG2H(h, hostname);
-  MSG2H(h, body);
-  MSG2H(h, login);
-  MSG2H(h, zsig);
-  MSG2H(h, zwriteline);
-  if (owl_message_get_header(m)) {
-    MSG2H(h, header); 
-  }
-  (void)hv_store(h, "time", strlen("time"), owl_new_sv(owl_message_get_timestr(m)),0);
-  (void)hv_store(h, "unix_time", strlen("unix_time"), newSViv(m->time), 0);
-  (void)hv_store(h, "id", strlen("id"), newSViv(owl_message_get_id(m)),0);
-  (void)hv_store(h, "deleted", strlen("deleted"), newSViv(owl_message_is_delete(m)),0);
-  (void)hv_store(h, "private", strlen("private"), newSViv(owl_message_is_private(m)),0);
-  (void)hv_store(h, "should_wordwrap",
-                 strlen("should_wordwrap"), newSViv(
-                                                    owl_filter_message_match(wrap, m)),0);
-
-  type = owl_message_get_type(m);
-  if(!type || !*type) type = "generic";
-  utype = owl_strdup(type);
-  utype[0] = toupper(type[0]);
-  blessas = owl_sprintf("BarnOwl::Message::%s", utype);
-
-  hr = newRV_noinc((SV*)h);
-  stash =  gv_stashpv(blessas,0);
-  if(!stash) {
-    owl_function_error("No such class: %s for message type %s", blessas, owl_message_get_type(m));
-    stash = gv_stashpv("BarnOwl::Message", 1);
-  }
-  hr = sv_bless(hr,stash);
-  owl_free(utype);
-  owl_free(blessas);
-  return hr;
+  return SvREFCNT_inc(m);
 }
 
 SV *owl_perlconfig_curmessage2hashref(void)
 {
-  int curmsg;
-  const owl_view *v;
-  v=owl_global_get_current_view(&g);
-  if (owl_view_get_size(v) < 1) {
+  owl_message *m = owl_global_get_current_message(&g);
+  if(m == NULL) {
     return &PL_sv_undef;
   }
-  curmsg=owl_global_get_curmsg(&g);
-  return owl_perlconfig_message2hashref(owl_view_get_element(v, curmsg));
+  return owl_perlconfig_message2hashref(m);
 }
 
-/* XXX TODO: Messages should round-trip properly between
-   message2hashref and hashref2message. Currently we lose
-   zephyr-specific properties stored in the ZNotice_t
-
-   This has been somewhat addressed, but is still not lossless.
- */
 owl_message * owl_perlconfig_hashref2message(SV *msg)
 {
-  owl_message * m;
-  HE * ent;
-  I32 count, len;
-  const char *key,*val;
-  HV * hash;
-  struct tm tm;
-
-  hash = (HV*)SvRV(msg);
-
-  m = owl_malloc(sizeof(owl_message));
-  owl_message_init(m);
-
-  count = hv_iterinit(hash);
-  while((ent = hv_iternext(hash))) {
-    key = hv_iterkey(ent, &len);
-    val = SvPV_nolen(hv_iterval(hash, ent));
-    if(!strcmp(key, "type")) {
-      owl_message_set_type(m, val);
-    } else if(!strcmp(key, "direction")) {
-      owl_message_set_direction(m, owl_message_parse_direction(val));
-    } else if(!strcmp(key, "private")) {
-      SV * v = hv_iterval(hash, ent);
-      if(SvTRUE(v)) {
-        owl_message_set_isprivate(m);
-      }
-    } else if (!strcmp(key, "hostname")) {
-      owl_message_set_hostname(m, val);
-    } else if (!strcmp(key, "zwriteline")) {
-      owl_message_set_zwriteline(m, val);
-    } else if (!strcmp(key, "time")) {
-      m->timestr = owl_strdup(val);
-      strptime(val, "%a %b %d %T %Y", &tm);
-      m->time = mktime(&tm);
-    } else {
-      owl_message_set_attribute(m, key, val);
-    }
-  }
-  if(owl_message_is_type_admin(m)) {
-    if(!owl_message_get_attribute_value(m, "adminheader"))
-      owl_message_set_attribute(m, "adminheader", "");
-  }
-#ifdef HAVE_LIBZEPHYR
-  if (owl_message_is_type_zephyr(m)) {
-    ZNotice_t *n = &(m->notice);
-    n->z_kind = ACKED;
-    n->z_port = 0;
-    n->z_auth = ZAUTH_NO;
-    n->z_checked_auth = 0;
-    n->z_class = zstr(owl_message_get_class(m));
-    n->z_class_inst = zstr(owl_message_get_instance(m));
-    n->z_opcode = zstr(owl_message_get_opcode(m));
-    n->z_sender = zstr(owl_message_get_sender(m));
-    n->z_recipient = zstr(owl_message_get_recipient(m));
-    n->z_default_format = zstr("[zephyr created from perl]");
-    n->z_multinotice = zstr("[zephyr created from perl]");
-    n->z_num_other_fields = 0;
-    n->z_message = owl_sprintf("%s%c%s", owl_message_get_zsig(m), '\0', owl_message_get_body(m));
-    n->z_message_len = strlen(owl_message_get_zsig(m)) + strlen(owl_message_get_body(m)) + 1;
-  }
-#endif
-  return m;
+  return (owl_message*)SvREFCNT_inc(msg);
 }
 
 /* Calls in a scalar context, passing it a hash reference.
@@ -361,6 +207,8 @@ char *owl_perlconfig_initperl(const char * file, int *Pargc, char ***Pargv, char
   p=perl_alloc();
   owl_global_set_perlinterp(&g, p);
   perl_construct(p);
+
+  PL_exit_flags |= PERL_EXIT_DESTRUCT_END;
 
   owl_global_set_no_have_config(&g);
 
@@ -641,4 +489,76 @@ void owl_perlconfig_perl_timer_destroy(owl_timer *t)
   if(SvOK((SV*)t->data)) {
     SvREFCNT_dec((SV*)t->data);
   }
+}
+
+SV * owl_perl_new(char *class)
+{
+  return owl_perl_new_argv(class, NULL, 0);
+}
+
+SV * owl_perl_new_argv(char *class, const char **argv, int argc)
+{
+  SV *obj;
+  int i;
+  OWL_PERL_CALL_METHOD(sv_2mortal(newSVpv(class, 0)), "new",
+                       for(i=0;i<argc;i++) {
+                         XPUSHs(sv_2mortal(newSVpv(argv[i], 0)));
+                       }
+                       ,
+                       "Error in perl: %s\n",
+                       1,
+                       obj = POPs;
+                       SvREFCNT_inc(obj);
+                       );
+  return obj;
+}
+
+void owl_perl_savetmps(void) {
+  ENTER;
+  SAVETMPS;
+}
+
+void owl_perl_freetmps(void) {
+  FREETMPS;
+  LEAVE;
+}
+
+void owl_perlconfig_do_dispatch(owl_io_dispatch *d)
+{
+  SV *cb = (SV*)d->data;
+  dSP;
+  if(cb == NULL) {
+    owl_function_error("Perl callback is NULL!");
+  }
+
+  ENTER;
+  SAVETMPS;
+
+  PUSHMARK(SP);
+  PUTBACK;
+  
+  call_sv(cb, G_DISCARD|G_KEEPERR|G_EVAL);
+
+  if(SvTRUE(ERRSV)) {
+    owl_function_error("%s", SvPV_nolen(ERRSV));
+  }
+
+  FREETMPS;
+  LEAVE;
+}
+
+void owl_perlconfig_invalidate_filter(owl_filter *f)
+{
+  dSP;
+  ENTER;
+  SAVETMPS;
+
+  PUSHMARK(SP);
+  XPUSHs(sv_2mortal(newSVpv(owl_filter_get_name(f), 0)));
+  PUTBACK;
+
+  call_pv("BarnOwl::Hooks::_invalidate_filter", G_DISCARD|G_KEEPERR|G_EVAL);
+
+  FREETMPS;
+  LEAVE;
 }

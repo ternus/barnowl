@@ -1,27 +1,99 @@
+#define OWL_PERL
+#define WINDOW FAKE_WINDOW
 #include "owl.h"
+#undef WINDOW
+
 #include <unistd.h>
 #include <stdlib.h>
+
+#undef instr
+#include <curses.h>
 
 owl_global g;
 
 int numtests;
 
+int owl_regtest(void);
 int owl_util_regtest(void);
 int owl_dict_regtest(void);
 int owl_variable_regtest(void);
 int owl_filter_regtest(void);
 int owl_obarray_regtest(void);
 int owl_editwin_regtest(void);
+int owl_list_regtest(void);
+
+extern void owl_perl_xs_init(pTHX);
 
 int main(int argc, char **argv, char **env)
 {
+  FILE *rnull;
+  FILE *wnull;
+  char *perlerr;
+  int status = 0;
+
+  if (argc <= 1) {
+    fprintf(stderr, "Usage: %s --builtin|TEST.t|-le CODE\n", argv[0]);
+    return 1;
+  }
+
   /* initialize a fake ncurses, detached from std{in,out} */
-  FILE *rnull = fopen("/dev/null", "r");
-  FILE *wnull = fopen("/dev/null", "w");
+  wnull = fopen("/dev/null", "w");
+  rnull = fopen("/dev/null", "r");
   newterm("xterm", wnull, rnull);
   /* initialize global structures */
   owl_global_init(&g);
 
+  perlerr = owl_perlconfig_initperl(NULL, &argc, &argv, &env);
+  if (perlerr) {
+    endwin();
+    fprintf(stderr, "Internal perl error: %s\n", perlerr);
+    status = 1;
+    goto out;
+  }
+
+  owl_global_complete_setup(&g);
+  owl_global_setup_default_filters(&g);
+
+  g.current_view = owl_view_new("all");
+
+  owl_global_set_current_style(&g, owl_global_get_style_by_name(&g, "default"));
+  owl_function_firstmsg();
+
+  ENTER;
+  SAVETMPS;
+
+  if (strcmp(argv[1], "--builtin") == 0) {
+    status = owl_regtest();
+  } else if (strcmp(argv[1], "-le") == 0 && argc > 2) {
+    /*
+     * 'prove' runs its harness perl with '-le CODE' to get some
+     * information out.
+     */
+    moreswitches("l");
+    eval_pv(argv[2], true);
+  } else {
+    sv_setpv(get_sv("0", false), argv[1]);
+    sv_setpv(get_sv("main::test_prog", TRUE), argv[1]);
+
+    eval_pv("do $main::test_prog; die($@) if($@)", true);
+  }
+
+  status = 0;
+
+  FREETMPS;
+  LEAVE;
+
+ out:
+  perl_destruct(owl_global_get_perlinterp(&g));
+  perl_free(owl_global_get_perlinterp(&g));
+  /* probably not necessary, but tear down the screen */
+  endwin();
+  fclose(rnull);
+  fclose(wnull);
+  return status;
+}
+
+int owl_regtest(void) {
   numtests = 0;
   int numfailures=0;
   /*
@@ -33,15 +105,11 @@ int main(int argc, char **argv, char **env)
   numfailures += owl_variable_regtest();
   numfailures += owl_filter_regtest();
   numfailures += owl_editwin_regtest();
+  numfailures += owl_list_regtest();
   if (numfailures) {
       fprintf(stderr, "# *** WARNING: %d failures total\n", numfailures);
   }
   printf("1..%d\n", numtests);
-
-  /* probably not necessary, but tear down the screen */
-  endwin();
-  fclose(rnull);
-  fclose(wnull);
 
   return(numfailures);
 }
@@ -232,23 +300,23 @@ static int owl_filter_test_string(const char *filt, const owl_message *m, int sh
 
 int owl_filter_regtest(void) {
   int numfailed=0;
-  owl_message m;
+  owl_message *m = owl_message_new();;
   owl_filter *f1, *f2, *f3, *f4, *f5;
 
   owl_dict_create(&g.filters);
   g.filterlist = NULL;
-  owl_message_init(&m);
-  owl_message_set_type_zephyr(&m);
-  owl_message_set_direction_in(&m);
-  owl_message_set_class(&m, "owl");
-  owl_message_set_instance(&m, "tester");
-  owl_message_set_sender(&m, "owl-user");
-  owl_message_set_recipient(&m, "joe");
-  owl_message_set_attribute(&m, "foo", "bar");
+  owl_message_init(m);
+  owl_message_set_type_zephyr(m);
+  owl_message_set_direction_in(m);
+  owl_message_set_class(m, "owl");
+  owl_message_set_instance(m, "tester");
+  owl_message_set_sender(m, "owl-user");
+  owl_message_set_recipient(m, "joe");
+  owl_message_set_attribute(m, "foo", "bar");
 
 #define TEST_FILTER(f, e) do {                          \
     numtests++;                                         \
-    numfailed += owl_filter_test_string(f, &m, e);      \
+    numfailed += owl_filter_test_string(f, m, e);      \
       } while(0)
 
   TEST_FILTER("true", 1);
@@ -339,3 +407,49 @@ int owl_editwin_regtest(void) {
 
   return numfailed;
 }
+
+int owl_list_regtest(void) {
+  int numfailed=0;
+  owl_list l;
+  intptr_t i;
+
+  printf("# BEGIN testing owl_list\n");
+
+  FAIL_UNLESS("create", 0 == owl_list_create(&l));
+  for(i=0;i<10;i++) {
+    FAIL_UNLESS("insert", 0 == owl_list_append_element(&l, (void*)i));
+  }
+
+  FAIL_UNLESS("size", 10 == owl_list_get_size(&l));
+
+  for(i=0;i<10;i++) {
+    FAIL_UNLESS("get", i == (intptr_t)owl_list_get_element(&l, i));
+  }
+
+  for(i=0;i<10;i++) {
+    FAIL_UNLESS("append tail", 0 == owl_list_append_element(&l, (void*)(10+i)));
+  }
+
+  FAIL_UNLESS("size", 20 == owl_list_get_size(&l));
+
+  for(i=10;i<20;i++) {
+    FAIL_UNLESS("get", i == (intptr_t)owl_list_get_element(&l, i));
+  }
+
+  for(i=9;i>=0;i--) {
+    FAIL_UNLESS("prepend", 0 == owl_list_prepend_element(&l, (void*)(-i)));
+  }
+
+  FAIL_UNLESS("size", 30 == owl_list_get_size(&l));
+
+  for(i=0;i<10;i++) {
+    FAIL_UNLESS("get beg", -i == (intptr_t)owl_list_get_element(&l, i));
+    FAIL_UNLESS("get mid", i == (intptr_t)owl_list_get_element(&l, 10+i));
+    FAIL_UNLESS("get end", 10+i == (intptr_t)owl_list_get_element(&l, 20+i));
+  }
+
+  printf("# END testing owl_list\n");
+
+  return numfailed;
+}
+
