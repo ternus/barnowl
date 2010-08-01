@@ -155,8 +155,12 @@ typedef void HV;
 #define OWL_TYPWIN_SIZE       8
 #define OWL_HISTORYSIZE       50
 
-/* Indicate current state, as well as what is allowed */
-#define OWL_CTX_ANY          0xffff
+/* Indicate current state, as well as what is allowed.
+ * Note: We treat an all-zero mode or active mask as allowing anything, so
+ * OWL_CTX_ANY is all zeros. This lets it also accept contexts without
+ * a mode or active set. */
+#define OWL_CTX_ANY          0x0000
+#define OWL_CTX_BITS         0xffff
 /* Only one of these may be active at a time... */
 #define OWL_CTX_MODE_BITS    0x000f
 #define OWL_CTX_STARTUP      0x0001
