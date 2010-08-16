@@ -71,7 +71,7 @@ const owl_cmd commands_to_init[]
 	      "",
 	      ""),
   
-  OWLCMD_ARGS("start-command", owl_command_start_command, OWL_CTX_INTERACTIVE,
+  OWLCMD_ARGS("start-command", owl_command_start_command, OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "prompts the user to enter a command",
 	      "start-command [initial-value]",
 	      "Initializes the command field to initial-value."),
@@ -103,7 +103,7 @@ const owl_cmd commands_to_init[]
 	      "Ex.: unbindkey recv H\n\n"
               "SEE ALSO: bindkey"),
 
-  OWLCMD_ARGS("zwrite", owl_command_zwrite, OWL_CTX_INTERACTIVE,
+  OWLCMD_ARGS("zwrite", owl_command_zwrite, OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "send a zephyr",
 	      "zwrite [-n] [-C] [-c class] [-i instance] [-r realm] [-O opcode] [<user> ...] [-m <message...>]",
 	      "Zwrite send a zephyr to the one or more users specified.\n\n"
@@ -123,25 +123,25 @@ const owl_cmd commands_to_init[]
 	      "-O opcode\n"
 	      "      Send to the specified opcode\n"),
 
-  OWLCMD_ARGS("aimwrite", owl_command_aimwrite, OWL_CTX_INTERACTIVE,
+  OWLCMD_ARGS("aimwrite", owl_command_aimwrite, OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "send an AIM message",
 	      "aimwrite <user> [-m <message...>]",
 	      "Send an aim message to a user.\n\n" 
               "The following options are available:\n\n"
               "-m    Specifies a message to send without prompting.\n"),
 
-  OWLCMD_ARGS("loopwrite", owl_command_loopwrite, OWL_CTX_INTERACTIVE,
+  OWLCMD_ARGS("loopwrite", owl_command_loopwrite, OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "send a loopback message",
 	      "loopwrite",
 	      "Send a local message.\n"),
 
-  OWLCMD_ARGS("zcrypt", owl_command_zwrite, OWL_CTX_INTERACTIVE,
+  OWLCMD_ARGS("zcrypt", owl_command_zwrite, OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "send an encrypted zephyr",
 	      "zcrypt [-n] [-C] [-c class] [-i instance] [-r realm] [-O opcode] [-m <message...>]\n",
 	      "Behaves like zwrite but uses encryption.  Not for use with\n"
 	      "personal messages\n"),
   
-  OWLCMD_ARGS("reply", owl_command_reply,  OWL_CTX_INTERACTIVE,
+  OWLCMD_ARGS("reply", owl_command_reply,  OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "reply to the current message",
 	      "reply [-e] [ sender | all | zaway ]",
 	      "If -e is specified, the zwrite command line is presented to\n"
@@ -225,7 +225,7 @@ const owl_cmd commands_to_init[]
 	      "getsubs retrieves the current subscriptions from the server\n"
 	      "and displays them.\n"),
 
-  OWLCMD_ARGS("dump", owl_command_dump, OWL_CTX_ANY,
+  OWLCMD_ARGS("dump", owl_command_dump, OWL_CTX_RECWIN,
 	      "dump messages to a file",
 	      "dump <filename>",
 	      "Dump messages in current view to the named file."),
@@ -255,7 +255,8 @@ const owl_cmd commands_to_init[]
 	      "join aim <groupname> [exchange]",
 	      "Join the AIM chatroom with 'groupname'.\n"),
 
-  OWLCMD_ARGS("smartzpunt", owl_command_smartzpunt, OWL_CTX_INTERACTIVE,
+  OWLCMD_ARGS("smartzpunt", owl_command_smartzpunt,
+	      OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "creates a zpunt based on the current message",
 	      "smartzpunt [-i | --instance]",
 	      "Starts a zpunt command based on the current message's class\n"
@@ -297,7 +298,8 @@ const owl_cmd commands_to_init[]
 	      "the list (see :show zpunts)\n\n"
 	      "SEE ALSO:  punt, zpunt, zunpunt, show zpunts\n"),
 
-  OWLCMD_VOID("info", owl_command_info, OWL_CTX_INTERACTIVE,
+  OWLCMD_VOID("info", owl_command_info,
+	      OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "display detailed information about the current message",
 	      "", ""),
   
@@ -320,39 +322,44 @@ const owl_cmd commands_to_init[]
 	      "blist",
 	      "Print a listing of buddies logged in, regardless of protocol."),
 
-  OWLCMD_VOID("toggle-oneline", owl_command_toggleoneline, OWL_CTX_INTERACTIVE,
+  OWLCMD_VOID("toggle-oneline", owl_command_toggleoneline,
+	      OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "Toggle the style between oneline and the default style",
 	      "toggle-oneline",
 	      ""),
 
-  OWLCMD_ARGS("recv:getshift", owl_command_get_shift, OWL_CTX_INTERACTIVE,
+  OWLCMD_ARGS("recv:getshift", owl_command_get_shift,
+	      OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "gets position of receive window scrolling", "", ""),
 
-  OWLCMD_INT("recv:setshift", owl_command_set_shift, OWL_CTX_INTERACTIVE,
-	      "scrolls receive window to specified position", "", ""),
+  OWLCMD_INT("recv:setshift", owl_command_set_shift,
+	     OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
+	     "scrolls receive window to specified position", "", ""),
 
   OWLCMD_VOID("recv:pagedown", owl_function_mainwin_pagedown, 
-	      OWL_CTX_INTERACTIVE,
+	      OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "scrolls down by a page", "", ""),
 
-  OWLCMD_VOID("recv:pageup", owl_function_mainwin_pageup, OWL_CTX_INTERACTIVE,
+  OWLCMD_VOID("recv:pageup", owl_function_mainwin_pageup,
+	      OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "scrolls up by a page", "", ""),
 
   OWLCMD_VOID("recv:mark", owl_function_mark_message,
-	      OWL_CTX_INTERACTIVE,
+	      OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "mark the current message", "", ""),
 
   OWLCMD_VOID("recv:swapmark", owl_function_swap_cur_marked,
-	      OWL_CTX_INTERACTIVE,
+	      OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "swap the positions of the pointer and the mark", "", ""),
 
-  OWLCMD_INT ("recv:scroll", owl_function_page_curmsg, OWL_CTX_INTERACTIVE,
+  OWLCMD_INT ("recv:scroll", owl_function_page_curmsg,
+	      OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "scrolls current message up or down", 
 	      "recv:scroll <numlines>", 
 	      "Scrolls the current message up or down by <numlines>.\n"
 	      "Scrolls up if <numlines> is negative, else scrolls down.\n"),
 
-  OWLCMD_ARGS("next", owl_command_next, OWL_CTX_INTERACTIVE,
+  OWLCMD_ARGS("next", owl_command_next, OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "move the pointer to the next message",
 	      "recv:next [ --filter <name> ] [ --skip-deleted ] [ --last-if-none ]\n"
 	      "          [ --smart-filter | --smart-filter-instance ]",
@@ -367,7 +374,7 @@ const owl_cmd commands_to_init[]
 	      "in the view if no other suitable messages are found.\n"),
   OWLCMD_ALIAS("recv:next", "next"),
 
-  OWLCMD_ARGS("prev", owl_command_prev, OWL_CTX_INTERACTIVE,
+  OWLCMD_ARGS("prev", owl_command_prev, OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "move the pointer to the previous message",
 	      "recv:prev [ --filter <name> ] [ --skip-deleted ] [ --first-if-none ]\n"
 	      "          [ --smart-filter | --smart-filter-instance ]",
@@ -392,11 +399,11 @@ const owl_cmd commands_to_init[]
 
   OWLCMD_ALIAS("recv:prev-personal", "recv:prev --filter personal"),
 
-  OWLCMD_VOID("first", owl_command_first, OWL_CTX_INTERACTIVE,
+  OWLCMD_VOID("first", owl_command_first, OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "move the pointer to the first message", "", ""),
   OWLCMD_ALIAS("recv:first", "first"),
 
-  OWLCMD_VOID("last", owl_command_last, OWL_CTX_INTERACTIVE,
+  OWLCMD_VOID("last", owl_command_last, OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "move the pointer to the last message", "", 
 	      "Moves the pointer to the last message in the view.\n"
 	      "If we are already at the last message in the view,\n"
@@ -405,7 +412,7 @@ const owl_cmd commands_to_init[]
 	      "of the screen.\n"),
   OWLCMD_ALIAS("recv:last", "last"),
 
-  OWLCMD_VOID("expunge", owl_command_expunge, OWL_CTX_INTERACTIVE,
+  OWLCMD_VOID("expunge", owl_command_expunge, OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "remove all messages marked for deletion", "", ""),
 
   OWLCMD_VOID("resize", owl_command_resize, OWL_CTX_ANY,
@@ -554,7 +561,7 @@ const owl_cmd commands_to_init[]
 	      "messages matching this filter should be displayed in.\n\n"
 	      "SEE ALSO: view, viewclass, viewuser\n"),
 
-  OWLCMD_ARGS("colorview", owl_command_colorview, OWL_CTX_INTERACTIVE,
+  OWLCMD_ARGS("colorview", owl_command_colorview, OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "change the colors on the current filter",
 	      "colorview <fgcolor> [<bgcolor>]",
 	      "The colors of messages in the current filter will be changed\n"
@@ -562,7 +569,7 @@ const owl_cmd commands_to_init[]
 	      "of valid colors.\n\n"
 	      "SEE ALSO: 'show colors'\n"),
 
-  OWLCMD_ARGS("colorclass", owl_command_colorclass, OWL_CTX_INTERACTIVE,
+  OWLCMD_ARGS("colorclass", owl_command_colorclass, OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "create a filter to color messages of the given class name",
 	      "colorclass <class> <fgcolor> [<bgcolor>]",
 	      "A filter will be created to color messages in <class>"
@@ -570,7 +577,7 @@ const owl_cmd commands_to_init[]
 	      "of valid colors.\n\n"
 	      "SEE ALSO: 'show colors'\n"),
 
-  OWLCMD_ARGS("view", owl_command_view, OWL_CTX_INTERACTIVE,
+  OWLCMD_ARGS("view", owl_command_view, OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "view messages matching a filter",
 	      "view [<viewname>] [-f <filter> | --home | -r ] [-s <style>]\n"
 	      "view <filter>\n"
@@ -591,7 +598,7 @@ const owl_cmd commands_to_init[]
               "applied as the view's filter\n"
 	      "SEE ALSO: filter, viewclass, viewuser\n"),
 
-  OWLCMD_ARGS("smartnarrow", owl_command_smartnarrow, OWL_CTX_INTERACTIVE,
+  OWLCMD_ARGS("smartnarrow", owl_command_smartnarrow, OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "view only messages similar to the current message",
 	      "smartnarrow [-i | --instance]  [-r | --related]",
 	      "If the curmsg is a personal message narrow\n"
@@ -605,7 +612,7 @@ const owl_cmd commands_to_init[]
 	      "If '-r' or '--related' is specified, behave as though the\n"
               "    'narrow-related' variable was inverted."),
 
-  OWLCMD_ARGS("smartfilter", owl_command_smartfilter, OWL_CTX_INTERACTIVE,
+  OWLCMD_ARGS("smartfilter", owl_command_smartfilter, OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "returns the name of a filter based on the current message",
 	      "smartfilter [-i | --instance]",
 	      "If the curmsg is a personal message, the filter is\n"
@@ -616,7 +623,7 @@ const owl_cmd commands_to_init[]
 	      "If the curmsg is a class message and '-i' is specified\n"
 	      "    the filter is to that class and instance.\n"),
 
-  OWLCMD_ARGS("viewclass", owl_command_viewclass, OWL_CTX_INTERACTIVE,
+  OWLCMD_ARGS("viewclass", owl_command_viewclass, OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "view messages matching a particular class",
 	      "viewclass <class>",
 	      "The viewclass command will automatically create a filter\n"
@@ -625,7 +632,7 @@ const owl_cmd commands_to_init[]
 	      "SEE ALSO: filter, view, viewuser\n"),
   OWLCMD_ALIAS("vc", "viewclass"),
 
-  OWLCMD_ARGS("viewuser", owl_command_viewuser, OWL_CTX_INTERACTIVE,
+  OWLCMD_ARGS("viewuser", owl_command_viewuser, OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "view messages matching a particular user",
 	      "viewuser <user>",
 	      "The viewuser command will automatically create a filter\n"
@@ -676,7 +683,7 @@ const owl_cmd commands_to_init[]
 	      "Show errors will show a list of errors encountered by Owl.\n\n"
 	      "SEE ALSO: filter, view, alias, bindkey, help\n"),
   
-  OWLCMD_ARGS("delete", owl_command_delete, OWL_CTX_INTERACTIVE,
+  OWLCMD_ARGS("delete", owl_command_delete, OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "mark a message for deletion",
 	      "delete [ -id msgid ] [ --no-move ]\n"
 	      "delete view\n"
@@ -691,7 +698,7 @@ const owl_cmd commands_to_init[]
 	      "current view.\n"),
   OWLCMD_ALIAS("del", "delete"),
 
-  OWLCMD_ARGS("undelete", owl_command_undelete, OWL_CTX_INTERACTIVE,
+  OWLCMD_ARGS("undelete", owl_command_undelete, OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "unmark a message for deletion",
 	      "undelete [ -id msgid ] [ --no-move ]\n"
 	      "undelete view",
@@ -714,7 +721,7 @@ const owl_cmd commands_to_init[]
 	      "prints a message into the debug log",
 	      "debug <message>", ""),
 
-  OWLCMD_ARGS("getview", owl_command_getview, OWL_CTX_INTERACTIVE,
+  OWLCMD_ARGS("getview", owl_command_getview, OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "returns the name of the filter for the current view",
 	      "", ""),
 
@@ -722,15 +729,15 @@ const owl_cmd commands_to_init[]
 	      "returns the value of a variable",
 	      "getvar <varname>", ""),
 
-  OWLCMD_ARGS("getfilter", owl_command_getfilter, OWL_CTX_INTERACTIVE,
+  OWLCMD_ARGS("getfilter", owl_command_getfilter, OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "returns the definition of a filter",
 	      "getfilter <filtername>", ""),
 
-  OWLCMD_ARGS("getstyle", owl_command_getstyle, OWL_CTX_INTERACTIVE,
+  OWLCMD_ARGS("getstyle", owl_command_getstyle, OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "returns the name of the style for the current view",
 	      "", ""),
 
-  OWLCMD_ARGS("search", owl_command_search, OWL_CTX_INTERACTIVE,
+  OWLCMD_ARGS("search", owl_command_search, OWL_CTX_INTERACTIVE|OWL_CTX_RECWIN,
 	      "search messages for a particular string",
 	      "search [-r] [<string>]",
 	      "The search command will find messages that contain the\n"
