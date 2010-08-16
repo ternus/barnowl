@@ -544,6 +544,25 @@ remove_timer(timer)
 		owl_function_debugmsg("Freeing timer %p", t);
 				owl_select_remove_timer(t);
 
+int
+_valid_in_parent_context (name)
+	const char *name;
+	PREINIT:
+		GList *node;
+		owl_context *ctx;
+		const owl_cmd *cmd;
+	CODE:
+		node = g.context_stack ? g_list_next(g.context_stack) : NULL;
+		ctx = node ? node->data : NULL;
+		if (!ctx) {
+			RETVAL = 0;
+		} else {
+			cmd = owl_cmddict_find(owl_global_get_cmddict(&g), name);
+			RETVAL = owl_cmd_is_context_valid(cmd, ctx);
+		}
+	OUTPUT:
+		RETVAL
+
 MODULE = BarnOwl		PACKAGE = BarnOwl::Editwin
 
 int

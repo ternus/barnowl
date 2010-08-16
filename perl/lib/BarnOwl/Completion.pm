@@ -145,7 +145,8 @@ sub get_completions {
 sub complete_command {
     my $cmd = shift;
     $cmd = "" unless defined($cmd);
-    return grep {$_ =~ m{^\Q$cmd\E}} @BarnOwl::all_commands;
+    return grep {$_ =~ m{^\Q$cmd\E} && BarnOwl::Internal::_valid_in_parent_context($_)}
+                @BarnOwl::all_commands;
 }
 
 sub register_completer {

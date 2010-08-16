@@ -43,7 +43,9 @@ my %show = (
     zpunts      => undef,
    );
 
-sub complete_command { return sort @BarnOwl::all_commands; }
+sub complete_command {
+    return sort grep { BarnOwl::Internal::_valid_in_parent_context($_) } @BarnOwl::all_commands;
+}
 sub complete_color { return @all_colors; }
 sub complete_variable    { return @{BarnOwl::all_variables()}; }
 sub complete_style       { return @{BarnOwl::all_styles()}; }
