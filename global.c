@@ -13,6 +13,7 @@
 #endif
 
 static void _owl_global_init_windows(owl_global *g);
+static void owl_global_delete_filter_ent(void *data);
 
 void owl_global_init(owl_global *g) {
   struct hostent *hent;
@@ -118,6 +119,70 @@ void owl_global_init(owl_global *g) {
   owl_list_create(&(g->psa_list));
   g->timerlist = NULL;
   g->interrupted = FALSE;
+}
+
+void owl_global_cleanup(owl_global *g) {
+  while (g->context_stack)
+    owl_global_pop_context(g);
+
+  /* owl_cmddict_cleanup(&(g->cmds)); */
+
+  /* owl_message_cleanup_fmtext_cache(); */
+  /* owl_list_create(&(g->io_dispatch_list)); */
+  /* owl_list_create(&(g->psa_list)); */
+  /* g->timerlist = NULL; */
+
+  /* g->zaldlist = NULL; */
+
+  /* owl_zbuddylist_cleanup(&(g->zbuddies)); */
+
+  /* owl_errqueue_cleanup(&(g->errqueue)); */
+
+  owl_buddylist_cleanup(&(g->buddylist));
+
+  /* owl_mainwin_cleanup(&(g->mw)); */
+  owl_msgwin_cleanup(&(g->msgwin));
+  /* owl_sepbar_cleanup(g->mainpanel.sepwin); */
+  owl_mainpanel_cleanup(&(g->mainpanel));
+  delwin(g->input_pad);
+  g->input_pad = NULL;
+
+  /* owl_messagelist_cleanup(&(g->msglist)); */
+
+  /* owl_history_cleanup(&(g->msghist)); */
+  /* owl_history_cleanup(&(g->cmdhist)); */
+
+  owl_dict_cleanup(&(g->styledict), (void (*)(void*))owl_style_delete);
+  /* owl_fmtext_cleanup_colorpair_mgr(&(g->cpmgr)); */
+  owl_regex_cleanup(&g->search_re);
+
+  /* TODO: clean up pointers in the GQueue */
+  g_queue_free(g->messagequeue);
+  g->messagequeue = NULL;
+
+  owl_list_cleanup(&(g->puntlist), (void (*)(void*))owl_filter_delete);
+
+  owl_dict_cleanup(&(g->filters), owl_global_delete_filter_ent);
+
+  /* owl_keyhandler_cleanup(&g->kh); */
+  /* also undo owl_keys_setup_keymaps(&g->kh); */
+
+  owl_variable_dict_cleanup(&(g->vars));
+
+  owl_free(g->startupargs);
+  owl_free(g->thishost);
+  owl_free(g->homedir);
+  owl_free(g->confdir);
+  owl_free(g->startupfile);
+  owl_free(g->aim_screenname);
+  owl_free(g->aim_screenname_for_filters);
+  g->startupargs = NULL;
+  g->thishost = NULL;
+  g->homedir = NULL;
+  g->confdir = NULL;
+  g->startupfile = NULL;
+  g->aim_screenname = NULL;
+  g->aim_screenname_for_filters = NULL;
 }
 
 static void _owl_global_init_windows(owl_global *g)
