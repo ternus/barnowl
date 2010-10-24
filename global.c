@@ -164,8 +164,7 @@ void owl_global_cleanup(owl_global *g) {
 
   owl_dict_cleanup(&(g->filters), owl_global_delete_filter_ent);
 
-  /* owl_keyhandler_cleanup(&g->kh); */
-  /* also undo owl_keys_setup_keymaps(&g->kh); */
+  owl_keyhandler_cleanup(&g->kh);
 
   owl_variable_dict_cleanup(&(g->vars));
 
