@@ -5,6 +5,11 @@ void owl_zbuddylist_create(owl_zbuddylist *zb)
   owl_list_create(&(zb->zusers));
 }
 
+void owl_zbuddylist_cleanup(owl_zbuddylist *zb)
+{
+  owl_list_cleanup(&(zb->zusers), owl_free);
+}
+
 int owl_zbuddylist_adduser(owl_zbuddylist *zb, const char *name)
 {
   int i, j;

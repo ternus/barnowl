@@ -134,9 +134,9 @@ void owl_global_cleanup(owl_global *g) {
 
   /* g->zaldlist = NULL; */
 
-  /* owl_zbuddylist_cleanup(&(g->zbuddies)); */
+  owl_zbuddylist_cleanup(&(g->zbuddies));
 
-  /* owl_errqueue_cleanup(&(g->errqueue)); */
+  owl_errqueue_cleanup(&(g->errqueue));
 
   owl_buddylist_cleanup(&(g->buddylist));
 
