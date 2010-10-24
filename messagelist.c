@@ -8,6 +8,11 @@ int owl_messagelist_create(owl_messagelist *ml)
   return(0);
 }
 
+void owl_messagelist_cleanup(owl_messagelist *ml)
+{
+  owl_list_cleanup(&(ml->list), (void (*)(void*)) owl_message_delete);
+}
+
 int owl_messagelist_get_size(const owl_messagelist *ml)
 {
   return(owl_list_get_size(&(ml->list)));

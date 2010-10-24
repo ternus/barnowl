@@ -147,7 +147,7 @@ void owl_global_cleanup(owl_global *g) {
   delwin(g->input_pad);
   g->input_pad = NULL;
 
-  /* owl_messagelist_cleanup(&(g->msglist)); */
+  owl_messagelist_cleanup(&(g->msglist));
 
   owl_history_cleanup(&(g->msghist));
   owl_history_cleanup(&(g->cmdhist));
