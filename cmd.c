@@ -21,6 +21,10 @@ int owl_cmddict_init(owl_cmddict *cd) {
   return(0);
 }
 
+void owl_cmddict_cleanup(owl_cmddict *cd) {
+  owl_dict_cleanup(cd, (void (*)(void *))owl_cmd_delete);
+}
+
 /* for bulk initialization at startup */
 int owl_cmddict_add_from_list(owl_cmddict *cd, const owl_cmd *cmds) {
   const owl_cmd *cur;

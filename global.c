@@ -125,7 +125,7 @@ void owl_global_cleanup(owl_global *g) {
   while (g->context_stack)
     owl_global_pop_context(g);
 
-  /* owl_cmddict_cleanup(&(g->cmds)); */
+  owl_cmddict_cleanup(&(g->cmds));
 
   /* owl_message_cleanup_fmtext_cache(); */
   /* owl_list_create(&(g->io_dispatch_list)); */
