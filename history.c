@@ -9,6 +9,11 @@ void owl_history_init(owl_history *h)
   h->repeats=1;                 /* by default we'll allow repeat entries */
 }
 
+void owl_history_cleanup(owl_history *h)
+{
+  owl_list_cleanup(&(h->hist), owl_free);
+}
+
 void owl_history_set_norepeats(owl_history *h)
 {
   h->repeats=0;

@@ -149,8 +149,8 @@ void owl_global_cleanup(owl_global *g) {
 
   /* owl_messagelist_cleanup(&(g->msglist)); */
 
-  /* owl_history_cleanup(&(g->msghist)); */
-  /* owl_history_cleanup(&(g->cmdhist)); */
+  owl_history_cleanup(&(g->msghist));
+  owl_history_cleanup(&(g->cmdhist));
 
   owl_dict_cleanup(&(g->styledict), (void (*)(void*))owl_style_delete);
   /* owl_fmtext_cleanup_colorpair_mgr(&(g->cpmgr)); */
