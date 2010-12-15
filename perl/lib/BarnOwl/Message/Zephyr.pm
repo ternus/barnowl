@@ -137,7 +137,7 @@ sub replycmd {
     $sender = 0 unless defined $sender;
     my ($class, $instance, $to, $cc);
     if($self->is_outgoing) {
-        return $self->{zwriteline};
+        return $self->{replyline};
     }
 
     if($sender && $self->opcode eq WEBZEPHYR_OPCODE) {

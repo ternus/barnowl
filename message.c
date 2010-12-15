@@ -483,6 +483,18 @@ void owl_message_set_zwriteline(owl_message *m, const char *line)
   owl_message_set_attribute(m, "zwriteline", line);
 }
 
+const char *owl_message_get_replyline(const owl_message *m)
+{
+  const char *z = owl_message_get_attribute_value(m, "replyline");
+  if (!z) return "";
+  return z;
+}
+
+void owl_message_set_replyline(owl_message *m, const char *line)
+{
+  owl_message_set_attribute(m, "replyline", line);
+}
+
 int owl_message_is_delete(const owl_message *m)
 {
   if (m == NULL) return(0);
@@ -963,6 +975,7 @@ void owl_message_create_from_zwrite(owl_message *m, const owl_zwrite *z, const c
 {
   int ret;
   char hostbuff[5000];
+  char *replyline;
   
   owl_message_init(m);
 
@@ -983,6 +996,11 @@ void owl_message_create_from_zwrite(owl_message *m, const owl_zwrite *z, const c
   if(z->zwriteline) {
     owl_message_set_zwriteline(m, z->zwriteline);
   }
+
+  replyline = owl_zwrite_get_replyline(z);
+  owl_message_set_replyline(m, replyline);
+  owl_free(replyline);
+
   owl_message_set_body(m, body);
   owl_message_set_zsig(m, owl_zwrite_get_zsig(z));
   
