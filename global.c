@@ -112,6 +112,9 @@ void owl_global_init(owl_global *g) {
   owl_list_create(&(g->psa_list));
   g->timerlist = NULL;
   g->kill_buffer = NULL;
+
+  g->interrupt_count = 0;
+  g->interrupt_lock = g_mutex_new();
 }
 
 static void _owl_global_init_windows(owl_global *g)
@@ -929,4 +932,23 @@ char *owl_global_get_kill_buffer(owl_global *g) {
 
 void owl_global_set_kill_buffer(owl_global *g,char *kill) {
   g->kill_buffer = kill;
+}
+
+void owl_global_add_interrupt(owl_global *g) {
+  /* TODO: This can almost certainly be done with atomic
+   * operations. Whatever. */
+  g_mutex_lock(g->interrupt_lock);
+  g->interrupt_count++;
+  g_mutex_unlock(g->interrupt_lock);
+}
+
+bool owl_global_take_interrupt(owl_global *g) {
+  bool ans = false;
+  g_mutex_lock(g->interrupt_lock);
+  if (g->interrupt_count > 0) {
+    ans = true;
+    g->interrupt_count--;
+  }
+  g_mutex_unlock(g->interrupt_lock);
+  return ans;
 }

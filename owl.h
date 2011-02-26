@@ -633,6 +633,8 @@ typedef struct _owl_global {
   int load_initial_subs;
   FILE *debug_file;
   char *kill_buffer;
+  int interrupt_count;
+  GMutex *interrupt_lock;
 } owl_global;
 
 /* globals */
