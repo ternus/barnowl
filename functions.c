@@ -2989,6 +2989,8 @@ void owl_function_search_helper(int consider_current, int direction)
     } else {
       i--;
     }
+#if 0
+    /* FIXME!!! */
     owl_function_mask_sigint(NULL);
     if(owl_global_is_interrupted(&g)) {
       owl_global_unset_interrupted(&g);
@@ -2998,6 +3000,7 @@ void owl_function_search_helper(int consider_current, int direction)
       return;
     }
     owl_function_unmask_sigint(NULL);
+#endif
   }
   owl_mainwin_redisplay(owl_global_get_mainwin(&g));
   owl_function_error("No matches found");
@@ -3080,6 +3083,8 @@ void owl_function_buddylist(int aim, int zephyr, const char *filename)
           user=owl_list_get_element(&anyone, i);
           ret=ZLocateUser(zstr(user), &numlocs, ZAUTH);
 
+#if 0
+	  /* FIXME!! */
           owl_function_mask_sigint(NULL);
           if(owl_global_is_interrupted(&g)) {
             interrupted = 1;
@@ -3090,6 +3095,7 @@ void owl_function_buddylist(int aim, int zephyr, const char *filename)
           }
 
           owl_function_unmask_sigint(NULL);
+#endif
 
           if (ret!=ZERR_NONE) {
             owl_function_error("Error getting location for %s", user);
