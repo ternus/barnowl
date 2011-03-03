@@ -12,7 +12,7 @@ typedef enum _owl_log_cmd { /* noproto */
 typedef struct _owl_log_msg { /* noproto */
   owl_log_cmd command;
   char *filename;
-  GString *message;
+  char *message;
 } owl_log_msg;
 
 static GAsyncQueue *log_message_queue;
@@ -84,8 +84,10 @@ int owl_log_shouldlog_message(const owl_message *m) {
   return(1);
 }
 
-void owl_log_zephyr(const owl_message *m, GString *buffer) {
-    char *tmp;
+char *owl_log_zephyr(const owl_message *m) {
+    char *tmp = NULL;
+    GString *buffer = NULL;
+    buffer = g_string_new("");
     tmp=short_zuser(owl_message_get_sender(m));
     g_string_append_printf(buffer, "Class: %s Instance: %s", 
                            owl_message_get_class(m), 
@@ -102,9 +104,12 @@ void owl_log_zephyr(const owl_message *m, GString *buffer) {
                            owl_message_get_zsig(m), tmp);
     g_string_append_printf(buffer, "%s\n\n", owl_message_get_body(m));
     g_free(tmp);
+    return g_string_free(buffer,FALSE);
 }
 
-void owl_log_aim(const owl_message *m, GString *buffer) {
+char *owl_log_aim(const owl_message *m) {
+    GString *buffer = NULL;
+    buffer = g_string_new("");
     g_string_append_printf(buffer, "From: <%s> To: <%s>\n", 
                            owl_message_get_sender(m), owl_message_get_recipient(m));
     g_string_append_printf(buffer, "Time: %s\n\n", 
@@ -116,18 +121,24 @@ void owl_log_aim(const owl_message *m, GString *buffer) {
     } else {
         g_string_append_printf(buffer, "%s\n\n", owl_message_get_body(m));
     }
+    return g_string_free(buffer,FALSE);
 }
 
-void owl_log_jabber(const owl_message *m, GString *buffer) {
+char *owl_log_jabber(const owl_message *m) {
+    GString *buffer = NULL;
+    buffer = g_string_new("");
     g_string_append_printf(buffer, "From: <%s> To: <%s>\n",
                            owl_message_get_sender(m), 
                            owl_message_get_recipient(m));
     g_string_append_printf(buffer, "Time: %s\n\n", 
                            owl_message_get_timestr(m));
     g_string_append_printf(buffer, "%s\n\n",owl_message_get_body(m));
+    return g_string_free(buffer,FALSE);
 }
 
-void owl_log_generic(const owl_message *m, GString *buffer) {
+char *owl_log_generic(const owl_message *m) {
+    GString *buffer;
+    buffer = g_string_new("");
     g_string_append_printf(buffer, "From: <%s> To: <%s>\n", 
                            owl_message_get_sender(m), 
                            owl_message_get_recipient(m));
@@ -135,9 +146,10 @@ void owl_log_generic(const owl_message *m, GString *buffer) {
                            owl_message_get_timestr(m));
     g_string_append_printf(buffer, "%s\n\n", 
                            owl_message_get_body(m));
+    return g_string_free(buffer,FALSE);
 }
 
-void owl_log_enqueue_message(GString *buffer, const char *filename)
+void owl_log_enqueue_message(char *buffer, const char *filename)
 {
   owl_log_msg *log_msg = NULL; 
   log_msg = g_new(owl_log_msg,1);
@@ -149,16 +161,15 @@ void owl_log_enqueue_message(GString *buffer, const char *filename)
 }
 
 void owl_log_append(const owl_message *m, const char *filename) {
-  GString *buffer = NULL;
-  buffer = g_string_new("");
+  char *buffer = NULL;
   if (owl_message_is_type_zephyr(m)) {
-    owl_log_zephyr(m, buffer);
+    buffer = owl_log_zephyr(m);
   } else if (owl_message_is_type_jabber(m)) {
-    owl_log_jabber(m, buffer);
+    buffer = owl_log_jabber(m);
   } else if (owl_message_is_type_aim(m)) {
-    owl_log_aim(m, buffer);
+    buffer = owl_log_aim(m);
   } else {
-    owl_log_generic(m, buffer);
+    buffer = owl_log_generic(m);
   }
   owl_log_enqueue_message(buffer, filename);
 }
@@ -245,7 +256,7 @@ void owl_log_outgoing_zephyr_error(const owl_zwrite *zw, const char *text)
   if (text[strlen(text)-1]!='\n') {
     g_string_append_printf(msgbuf, "\n");
   }
-  owl_log_enqueue_message(msgbuf,filename);
+  owl_log_enqueue_message(g_string_free(msgbuf,FALSE),filename);
 
   filename = g_strdup_printf("%s/all", logpath);
   g_free(logpath);
@@ -256,7 +267,7 @@ void owl_log_outgoing_zephyr_error(const owl_zwrite *zw, const char *text)
   if (text[strlen(text)-1]!='\n') {
     g_string_append_printf(msgbuf, "\n");
   }
-  owl_log_enqueue_message(msgbuf,filename);
+  owl_log_enqueue_message(g_string_free(msgbuf,FALSE),filename);
 
   g_free(tobuff);
 }
@@ -386,7 +397,7 @@ static void owl_log_free_message(owl_log_msg *cmd)
 {
   if(cmd) {
     if(cmd->message) {
-      g_string_free(cmd->message, TRUE);
+      g_free(cmd->message);
     }
     if(cmd->filename) {
       g_free(cmd->filename);
@@ -406,7 +417,7 @@ static void owl_log_error(char *message)
   owl_select_post_task(owl_log_error_idle_func,message,NULL);
 }
 
-static void owl_log_write_msg(GString *message, char *filename)
+static void owl_log_write_msg(char *message, char *filename)
 {
   FILE *file = NULL;
   file=fopen(filename, "a");
@@ -414,7 +425,7 @@ static void owl_log_write_msg(GString *message, char *filename)
     owl_log_error("Unable to open file for logging");
     return;
   }
-  fprintf(file, message->str);
+  fprintf(file, message);
   fclose(file);
 }
 
