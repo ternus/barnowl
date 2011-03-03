@@ -403,13 +403,7 @@ static gboolean owl_log_error_idle_func(gpointer data)
 
 static void owl_log_error(char *message)
 {
-  GSource *source = NULL;
-  source = g_idle_source_new();
-  g_source_set_priority(source,G_PRIORITY_DEFAULT);
-  g_source_set_callback(source, owl_log_error_idle_func,
-                        message, NULL);
-  g_source_attach(source, g_main_context_default());
-  g_source_unref(source);
+  owl_select_post_task(owl_log_error_idle_func,message,NULL);
 }
 
 static void owl_log_write_msg(GString *message, char *filename)
