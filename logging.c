@@ -4,18 +4,14 @@
 #include <ctype.h>
 #include <sys/param.h>
 
-typedef enum _owl_log_cmd { /* noproto */
-  LOG,
-  EXIT
-} owl_log_cmd;
-
 typedef struct _owl_log_msg { /* noproto */
-  owl_log_cmd command;
   char *filename;
   char *message;
 } owl_log_msg;
 
-static GAsyncQueue *log_message_queue;
+
+static GMainContext *log_context;
+static GMainLoop *log_loop;
 // shouldn't need this, but just in case...
 static GThread *logging_thread;
 
@@ -149,15 +145,51 @@ char *owl_log_generic(const owl_message *m) {
     return g_string_free(buffer,FALSE);
 }
 
+static gboolean owl_log_error_idle_func(gpointer data)
+{
+  owl_function_error((char*)data);
+  return FALSE;
+}
+
+static void owl_log_error(char *message)
+{
+  owl_select_post_task(owl_log_error_idle_func,message,NULL,NULL);
+}
+
+static gboolean owl_log_write_msg(owl_log_msg *msg)
+{
+  FILE *file = NULL;
+  file=fopen(msg->filename, "a");
+  if (!file) {
+    owl_log_error("Unable to open file for logging");
+    return FALSE;
+  }
+  fprintf(file, msg->message);
+  fclose(file);
+  return FALSE;
+}
+
+static void owl_log_free_message(owl_log_msg *msg)
+{
+  if(msg) {
+    if(msg->message) {
+      g_free(msg->message);
+    }
+    if(msg->filename) {
+      g_free(msg->filename);
+    }
+    g_free(msg);
+  }
+}
+
 void owl_log_enqueue_message(char *buffer, const char *filename)
 {
   owl_log_msg *log_msg = NULL; 
   log_msg = g_new(owl_log_msg,1);
-  log_msg->command = LOG;
   log_msg->message = buffer;
   log_msg->filename = g_strdup(filename);
-  
-  g_async_queue_push(log_message_queue,log_msg);
+  owl_select_post_task(owl_log_write_msg,
+                       log_msg,owl_log_free_message,log_context);
 }
 
 void owl_log_append(const owl_message *m, const char *filename) {
@@ -393,58 +425,11 @@ void owl_log_incoming(const owl_message *m)
   g_free(logpath);
 }
 
-static void owl_log_free_message(owl_log_msg *cmd)
-{
-  if(cmd) {
-    if(cmd->message) {
-      g_free(cmd->message);
-    }
-    if(cmd->filename) {
-      g_free(cmd->filename);
-    }
-    g_free(cmd);
-  }
-}
-
-static gboolean owl_log_error_idle_func(gpointer data)
-{
-  owl_function_error((char*)data);
-  return FALSE;
-}
-
-static void owl_log_error(char *message)
-{
-  owl_select_post_task(owl_log_error_idle_func,message,NULL);
-}
-
-static void owl_log_write_msg(char *message, char *filename)
-{
-  FILE *file = NULL;
-  file=fopen(filename, "a");
-  if (!file) {
-    owl_log_error("Unable to open file for logging");
-    return;
-  }
-  fprintf(file, message);
-  fclose(file);
-}
-
 static gpointer owl_log_thread_func(gpointer data)
 {
-  owl_log_msg *cmd = NULL;
-  gboolean running = TRUE;
-  while(running) {
-    cmd = g_async_queue_pop(log_message_queue);
-    switch(cmd->command) {
-    case EXIT:
-      running = FALSE;
-      break;
-    case LOG:
-      owl_log_write_msg(cmd->message, cmd->filename);
-      owl_log_free_message(cmd);
-      break;
-    }
-  }
+  log_context = g_main_context_new();
+  log_loop = g_main_loop_new(log_context, FALSE);
+  g_main_loop_run(log_loop);
   return NULL;
 }
 
@@ -452,10 +437,10 @@ void owl_log_init()
 {
   GError *error = NULL;
   //  g_thread_init(NULL);
-  log_message_queue = g_async_queue_new();
+  //  log_message_queue = g_async_queue_new();
   logging_thread = g_thread_create(owl_log_thread_func,
                                    NULL,
-                                   FALSE,
+                                   TRUE,
                                    &error);
   if(error) {
     endwin();
@@ -470,10 +455,6 @@ void owl_log_init()
 
 void owl_log_shutdown()
 {
-  owl_log_msg *msg;
-  msg = g_new(owl_log_msg,1);
-  msg->command = EXIT;
-  msg->message = NULL;
-  msg->filename = NULL;
-  g_async_queue_push(log_message_queue,msg);
+  g_main_loop_quit(log_loop);
+  g_thread_join(logging_thread);
 }
