@@ -453,8 +453,14 @@ void owl_log_init()
   
 }
 
-void owl_log_shutdown()
+static gboolean owl_log_quit_func(gpointer data)
 {
   g_main_loop_quit(log_loop);
+  return FALSE;
+}
+
+void owl_log_shutdown()
+{
+  owl_select_post_task(owl_log_quit_func,NULL,NULL,log_context);
   g_thread_join(logging_thread);
 }
