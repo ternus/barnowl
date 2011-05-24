@@ -433,7 +433,7 @@ static gpointer owl_log_thread_func(gpointer data)
   return NULL;
 }
 
-void owl_log_init() 
+void owl_log_init(void) 
 {
   GError *error = NULL;
   //  g_thread_init(NULL);
@@ -459,7 +459,7 @@ static gboolean owl_log_quit_func(gpointer data)
   return FALSE;
 }
 
-void owl_log_shutdown()
+void owl_log_shutdown(void)
 {
   owl_select_post_task(owl_log_quit_func,NULL,NULL,log_context);
   g_thread_join(logging_thread);
