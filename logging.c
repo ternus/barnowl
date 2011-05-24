@@ -12,7 +12,6 @@ typedef struct _owl_log_msg { /* noproto */
 
 static GMainContext *log_context;
 static GMainLoop *log_loop;
-// shouldn't need this, but just in case...
 static GThread *logging_thread;
 
 /* This is now the one function that should be called to log a
