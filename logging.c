@@ -4,10 +4,10 @@
 #include <ctype.h>
 #include <sys/param.h>
 
-typedef struct _owl_log_msg { /* noproto */
+typedef struct _owl_log_entry { /* noproto */
   char *filename;
   char *message;
-} owl_log_msg;
+} owl_log_entry;
 
 
 static GMainContext *log_context;
@@ -155,7 +155,7 @@ static void owl_log_error(char *message)
   owl_select_post_task(owl_log_error_idle_func,message,NULL,NULL);
 }
 
-static gboolean owl_log_write_msg(owl_log_msg *msg)
+static gboolean owl_log_write_entry(owl_log_entry *msg)
 {
   FILE *file = NULL;
   file=fopen(msg->filename, "a");
@@ -168,7 +168,7 @@ static gboolean owl_log_write_msg(owl_log_msg *msg)
   return FALSE;
 }
 
-static void owl_log_free_message(owl_log_msg *msg)
+static void owl_log_free_message(owl_log_entry *msg)
 {
   if(msg) {
     if(msg->message) {
@@ -183,11 +183,11 @@ static void owl_log_free_message(owl_log_msg *msg)
 
 void owl_log_enqueue_message(char *buffer, const char *filename)
 {
-  owl_log_msg *log_msg = NULL; 
-  log_msg = g_new(owl_log_msg,1);
+  owl_log_entry *log_msg = NULL; 
+  log_msg = g_new(owl_log_entry,1);
   log_msg->message = buffer;
   log_msg->filename = g_strdup(filename);
-  owl_select_post_task(owl_log_write_msg,
+  owl_select_post_task(owl_log_write_entry,
                        log_msg,owl_log_free_message,log_context);
 }
 
