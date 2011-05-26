@@ -99,7 +99,7 @@ char *owl_log_zephyr(const owl_message *m) {
                            owl_message_get_zsig(m), tmp);
     g_string_append_printf(buffer, "%s\n\n", owl_message_get_body(m));
     g_free(tmp);
-    return g_string_free(buffer,FALSE);
+    return g_string_free(buffer, FALSE);
 }
 
 char *owl_log_aim(const owl_message *m) {
@@ -116,7 +116,7 @@ char *owl_log_aim(const owl_message *m) {
     } else {
         g_string_append_printf(buffer, "%s\n\n", owl_message_get_body(m));
     }
-    return g_string_free(buffer,FALSE);
+    return g_string_free(buffer, FALSE);
 }
 
 char *owl_log_jabber(const owl_message *m) {
@@ -127,8 +127,8 @@ char *owl_log_jabber(const owl_message *m) {
                            owl_message_get_recipient(m));
     g_string_append_printf(buffer, "Time: %s\n\n", 
                            owl_message_get_timestr(m));
-    g_string_append_printf(buffer, "%s\n\n",owl_message_get_body(m));
-    return g_string_free(buffer,FALSE);
+    g_string_append_printf(buffer, "%s\n\n", owl_message_get_body(m));
+    return g_string_free(buffer, FALSE);
 }
 
 char *owl_log_generic(const owl_message *m) {
@@ -141,7 +141,7 @@ char *owl_log_generic(const owl_message *m) {
                            owl_message_get_timestr(m));
     g_string_append_printf(buffer, "%s\n\n", 
                            owl_message_get_body(m));
-    return g_string_free(buffer,FALSE);
+    return g_string_free(buffer, FALSE);
 }
 
 static void owl_log_error_idle_func(gpointer data)
@@ -152,7 +152,8 @@ static void owl_log_error_idle_func(gpointer data)
 static void owl_log_error(const char *message)
 {
   char *data = g_strdup(message);
-  owl_select_post_task(owl_log_error_idle_func,data,g_free,NULL);
+  owl_select_post_task(owl_log_error_idle_func,
+		       data, g_free, NULL);
 }
 
 static void owl_log_write_entry(gpointer data)
@@ -171,11 +172,11 @@ static void owl_log_write_entry(gpointer data)
 static void owl_log_entry_free(void *data)
 {
   owl_log_entry *msg = (owl_log_entry*)data;
-  if(msg) {
-    if(msg->message) {
+  if (msg) {
+    if (msg->message) {
       g_free(msg->message);
     }
-    if(msg->filename) {
+    if (msg->filename) {
       g_free(msg->filename);
     }
     g_free(msg);
@@ -188,8 +189,8 @@ void owl_log_enqueue_message(char *buffer, const char *filename)
   log_msg = g_new(owl_log_entry,1);
   log_msg->message = buffer;
   log_msg->filename = g_strdup(filename);
-  owl_select_post_task(owl_log_write_entry,
-                       log_msg,owl_log_entry_free,log_context);
+  owl_select_post_task(owl_log_write_entry, log_msg, 
+		       owl_log_entry_free, log_context);
 }
 
 void owl_log_append(const owl_message *m, const char *filename) {
@@ -288,7 +289,7 @@ void owl_log_outgoing_zephyr_error(const owl_zwrite *zw, const char *text)
   if (text[strlen(text)-1]!='\n') {
     g_string_append_printf(msgbuf, "\n");
   }
-  owl_log_enqueue_message(g_string_free(msgbuf,FALSE),filename);
+  owl_log_enqueue_message(g_string_free(msgbuf, FALSE), filename);
 
   filename = g_strdup_printf("%s/all", logpath);
   g_free(logpath);
@@ -299,7 +300,7 @@ void owl_log_outgoing_zephyr_error(const owl_zwrite *zw, const char *text)
   if (text[strlen(text)-1]!='\n') {
     g_string_append_printf(msgbuf, "\n");
   }
-  owl_log_enqueue_message(g_string_free(msgbuf,FALSE),filename);
+  owl_log_enqueue_message(g_string_free(msgbuf, FALSE), filename);
 
   g_free(tobuff);
 }
@@ -353,9 +354,11 @@ void owl_log_incoming(const owl_message *m)
     from=frombuff=g_strdup("loopback");
   } else if (owl_message_is_type_jabber(m)) {
     if (personal) {
-      from=frombuff=g_strdup_printf("jabber:%s",owl_message_get_sender(m));
+      from=frombuff=g_strdup_printf("jabber:%s", 
+				    owl_message_get_sender(m));
     } else {
-      from=frombuff=g_strdup_printf("jabber:%s",owl_message_get_recipient(m));
+      from=frombuff=g_strdup_printf("jabber:%s", 
+				    owl_message_get_recipient(m));
     }
   } else {
     from=frombuff=g_strdup("unknown");
@@ -440,7 +443,7 @@ void owl_log_init(void)
                                    NULL,
                                    TRUE,
                                    &error);
-  if(error) {
+  if (error) {
     endwin();
     fprintf(stderr, "Error spawning logging thread: %s\n", error->message);
     fflush(stderr);
@@ -458,6 +461,7 @@ static void owl_log_quit_func(gpointer data)
 
 void owl_log_shutdown(void)
 {
-  owl_select_post_task(owl_log_quit_func,NULL,NULL,log_context);
+  owl_select_post_task(owl_log_quit_func, NULL,
+		       NULL, log_context);
   g_thread_join(logging_thread);
 }
