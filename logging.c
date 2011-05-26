@@ -146,12 +146,13 @@ char *owl_log_generic(const owl_message *m) {
 
 static void owl_log_error_idle_func(gpointer data)
 {
-  owl_function_error("%s",(char*)data);
+  owl_function_error("%s", (const char*)data);
 }
 
-static void owl_log_error(char *message)
+static void owl_log_error(const char *message)
 {
-  owl_select_post_task(owl_log_error_idle_func,message,NULL,NULL);
+  char *data = g_strdup(message);
+  owl_select_post_task(owl_log_error_idle_func,data,g_free,NULL);
 }
 
 static void owl_log_write_entry(gpointer data)
