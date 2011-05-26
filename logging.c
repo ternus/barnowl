@@ -173,12 +173,8 @@ static void owl_log_entry_free(void *data)
 {
   owl_log_entry *msg = (owl_log_entry*)data;
   if (msg) {
-    if (msg->message) {
-      g_free(msg->message);
-    }
-    if (msg->filename) {
-      g_free(msg->filename);
-    }
+    g_free(msg->message);
+    g_free(msg->filename);
     g_free(msg);
   }
 }
