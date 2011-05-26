@@ -146,7 +146,7 @@ char *owl_log_generic(const owl_message *m) {
 
 static void owl_log_error_idle_func(gpointer data)
 {
-  owl_function_error((char*)data);
+  owl_function_error("%s",(char*)data);
 }
 
 static void owl_log_error(char *message)
@@ -163,7 +163,7 @@ static void owl_log_write_entry(gpointer data)
     owl_log_error("Unable to open file for logging");
     return;
   }
-  fprintf(file, msg->message);
+  fprintf(file, "%s", msg->message);
   fclose(file);
 }
 
