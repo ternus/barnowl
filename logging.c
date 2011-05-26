@@ -291,8 +291,8 @@ void owl_log_outgoing_zephyr_error(const owl_zwrite *zw, const char *text)
 
   filename = g_strdup_printf("%s/all", logpath);
   g_free(logpath);
-  // we gave up ownership of the previous GString msgbuf pointed to
-  // when we put it on the log queue
+  /* we gave up ownership of the previous GString msgbuf pointed to
+     when we put it on the log queue */
   msgbuf = g_string_new("");
   g_string_printf(msgbuf, "ERROR (owl): %s\n%s\n", tobuff, text);
   if (text[strlen(text)-1]!='\n') {
@@ -435,8 +435,6 @@ static gpointer owl_log_thread_func(gpointer data)
 void owl_log_init(void) 
 {
   GError *error = NULL;
-  //  g_thread_init(NULL);
-  //  log_message_queue = g_async_queue_new();
   logging_thread = g_thread_create(owl_log_thread_func,
                                    NULL,
                                    TRUE,
