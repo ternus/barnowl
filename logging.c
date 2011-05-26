@@ -144,10 +144,9 @@ char *owl_log_generic(const owl_message *m) {
     return g_string_free(buffer,FALSE);
 }
 
-static gboolean owl_log_error_idle_func(gpointer data)
+static void owl_log_error_idle_func(gpointer data)
 {
   owl_function_error((char*)data);
-  return FALSE;
 }
 
 static void owl_log_error(char *message)
@@ -155,21 +154,22 @@ static void owl_log_error(char *message)
   owl_select_post_task(owl_log_error_idle_func,message,NULL,NULL);
 }
 
-static gboolean owl_log_write_entry(owl_log_entry *msg)
+static void owl_log_write_entry(gpointer data)
 {
+  owl_log_entry *msg = (owl_log_entry*)data;
   FILE *file = NULL;
   file=fopen(msg->filename, "a");
   if (!file) {
     owl_log_error("Unable to open file for logging");
-    return FALSE;
+    return;
   }
   fprintf(file, msg->message);
   fclose(file);
-  return FALSE;
 }
 
-static void owl_log_free_message(owl_log_entry *msg)
+static void owl_log_free_message(void *data)
 {
+  owl_log_entry *msg = (owl_log_entry*)data;
   if(msg) {
     if(msg->message) {
       g_free(msg->message);
@@ -452,10 +452,9 @@ void owl_log_init(void)
   
 }
 
-static gboolean owl_log_quit_func(gpointer data)
+static void owl_log_quit_func(gpointer data)
 {
   g_main_loop_quit(log_loop);
-  return FALSE;
 }
 
 void owl_log_shutdown(void)
