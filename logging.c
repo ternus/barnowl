@@ -167,7 +167,7 @@ static void owl_log_write_entry(gpointer data)
   fclose(file);
 }
 
-static void owl_log_free_message(void *data)
+static void owl_log_entry_free(void *data)
 {
   owl_log_entry *msg = (owl_log_entry*)data;
   if(msg) {
@@ -188,7 +188,7 @@ void owl_log_enqueue_message(char *buffer, const char *filename)
   log_msg->message = buffer;
   log_msg->filename = g_strdup(filename);
   owl_select_post_task(owl_log_write_entry,
-                       log_msg,owl_log_free_message,log_context);
+                       log_msg,owl_log_entry_free,log_context);
 }
 
 void owl_log_append(const owl_message *m, const char *filename) {
