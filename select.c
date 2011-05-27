@@ -387,10 +387,6 @@ void owl_select_post_task(void (*cb)(void*), void *cbdata, void (*destroy_cbdata
   t->destroy_cbdata = destroy_cbdata;
   g_source_set_priority(source, G_PRIORITY_DEFAULT);
   g_source_set_callback(source, _run_task, t, _destroy_task);
-  if(context) {
-    g_source_attach(source, context);
-  } else {
-    g_source_attach(source, main_context);
-  }
+  g_source_attach(source, context);
   g_source_unref(source);
 }
