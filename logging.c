@@ -153,7 +153,7 @@ static void owl_log_error(const char *message)
 {
   char *data = g_strdup(message);
   owl_select_post_task(owl_log_error_idle_func,
-		       data, g_free, NULL);
+		       data, g_free, g_main_context_default());
 }
 
 static void owl_log_write_entry(gpointer data)
