@@ -83,7 +83,7 @@ char *owl_log_zephyr(const owl_message *m) {
     char *tmp = NULL;
     GString *buffer = NULL;
     buffer = g_string_new("");
-    tmp=short_zuser(owl_message_get_sender(m));
+    tmp = short_zuser(owl_message_get_sender(m));
     g_string_append_printf(buffer, "Class: %s Instance: %s", 
                            owl_message_get_class(m), 
                            owl_message_get_instance(m));
@@ -160,7 +160,7 @@ static void owl_log_write_entry(gpointer data)
 {
   owl_log_entry *msg = (owl_log_entry*)data;
   FILE *file = NULL;
-  file=fopen(msg->filename, "a");
+  file = fopen(msg->filename, "a");
   if (!file) {
     owl_log_error("Unable to open file for logging");
     return;
@@ -282,7 +282,7 @@ void owl_log_outgoing_zephyr_error(const owl_zwrite *zw, const char *text)
   filename = g_strdup_printf("%s/%s", logpath, tobuff);
   msgbuf = g_string_new("");
   g_string_printf(msgbuf, "ERROR (owl): %s\n%s\n", tobuff, text);
-  if (text[strlen(text)-1]!='\n') {
+  if (text[strlen(text)-1] != '\n') {
     g_string_append_printf(msgbuf, "\n");
   }
   owl_log_enqueue_message(g_string_free(msgbuf, FALSE), filename);
@@ -293,7 +293,7 @@ void owl_log_outgoing_zephyr_error(const owl_zwrite *zw, const char *text)
      when we put it on the log queue */
   msgbuf = g_string_new("");
   g_string_printf(msgbuf, "ERROR (owl): %s\n%s\n", tobuff, text);
-  if (text[strlen(text)-1]!='\n') {
+  if (text[strlen(text)-1] != '\n') {
     g_string_append_printf(msgbuf, "\n");
   }
   owl_log_enqueue_message(g_string_free(msgbuf, FALSE), filename);
