@@ -443,8 +443,6 @@ void owl_log_init(void)
     endwin();
     fprintf(stderr, "Error spawning logging thread: %s\n", error->message);
     fflush(stderr);
-    printf("Error spawning logging thread: %s\n", error->message);
-    fflush(stdout);
     exit(1);
   }
   
