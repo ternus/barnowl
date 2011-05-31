@@ -183,7 +183,7 @@ void owl_log_enqueue_message(char *buffer, const char *filename)
 {
   owl_log_entry *log_msg = NULL; 
   log_msg = g_new(owl_log_entry,1);
-  log_msg->message = buffer;
+  log_msg->message = g_strdup(buffer);
   log_msg->filename = g_strdup(filename);
   owl_select_post_task(owl_log_write_entry, log_msg, 
 		       owl_log_entry_free, log_context);
@@ -201,6 +201,7 @@ void owl_log_append(const owl_message *m, const char *filename) {
     buffer = owl_log_generic(m);
   }
   owl_log_enqueue_message(buffer, filename);
+  g_free(buffer);
 }
 
 void owl_log_outgoing(const owl_message *m)
@@ -285,18 +286,18 @@ void owl_log_outgoing_zephyr_error(const owl_zwrite *zw, const char *text)
   if (text[strlen(text)-1] != '\n') {
     g_string_append_printf(msgbuf, "\n");
   }
-  owl_log_enqueue_message(g_string_free(msgbuf, FALSE), filename);
+  owl_log_enqueue_message(msgbuf->str, filename);
+  g_string_free(msgbuf, TRUE);
 
   filename = g_strdup_printf("%s/all", logpath);
   g_free(logpath);
-  /* we gave up ownership of the previous GString msgbuf pointed to
-     when we put it on the log queue */
   msgbuf = g_string_new("");
   g_string_printf(msgbuf, "ERROR (owl): %s\n%s\n", tobuff, text);
   if (text[strlen(text)-1] != '\n') {
     g_string_append_printf(msgbuf, "\n");
   }
-  owl_log_enqueue_message(g_string_free(msgbuf, FALSE), filename);
+  owl_log_enqueue_message(msgbuf->str, filename);
+  g_string_free(msgbuf, TRUE);
 
   g_free(tobuff);
 }
