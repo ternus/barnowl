@@ -144,7 +144,7 @@ char *owl_log_generic(const owl_message *m) {
     return g_string_free(buffer, FALSE);
 }
 
-static void owl_log_error_idle_func(gpointer data)
+static void owl_log_error_main_thread(gpointer data)
 {
   owl_function_error("%s", (const char*)data);
 }
@@ -152,7 +152,7 @@ static void owl_log_error_idle_func(gpointer data)
 static void owl_log_error(const char *message)
 {
   char *data = g_strdup(message);
-  owl_select_post_task(owl_log_error_idle_func,
+  owl_select_post_task(owl_log_error_main_thread,
 		       data, g_free, g_main_context_default());
 }
 
