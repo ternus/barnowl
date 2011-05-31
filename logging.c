@@ -179,7 +179,7 @@ static void owl_log_entry_free(void *data)
   }
 }
 
-void owl_log_enqueue_message(char *buffer, const char *filename)
+void owl_log_enqueue_message(const char *buffer, const char *filename)
 {
   owl_log_entry *log_msg = NULL; 
   log_msg = g_new(owl_log_entry,1);
