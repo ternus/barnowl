@@ -235,10 +235,11 @@ typedef struct _owl_variable {
   const char *validsettings;	/* documentation of valid settings */
   char *summary;		/* summary of usage */
   char *description;		/* detailed description */
-  void *val;                    /* current value */
-  int  (*validate_fn)(const struct _owl_variable *v, const void *newval);
+  GValue gval_default;
+  GValue val;                    /* current value */
+  int  (*validate_fn)(const struct _owl_variable *v, const GValue *newval);
                                 /* returns 1 if newval is valid */
-  int  (*set_fn)(struct _owl_variable *v, const void *newval); 
+  int  (*set_fn)(struct _owl_variable *v, const GValue *newval); 
                                 /* sets the variable to a value
 				 * of the appropriate type.
 				 * unless documented, this 
@@ -250,11 +251,11 @@ typedef struct _owl_variable {
 				 * unless documented, this 
 				 * should make a copy. 
 				 * returns 0 on success. */
-  const void *(*get_fn)(const struct _owl_variable *v);
+  const GValue *(*get_fn)(const struct _owl_variable *v);
 				/* returns a reference to the current value.
 				 * WARNING:  this approach is hard to make
 				 * thread-safe... */
-  CALLER_OWN char *(*get_tostring_fn)(const struct _owl_variable *v, const void *val);
+  CALLER_OWN char *(*get_tostring_fn)(const struct _owl_variable *v, const GValue *val);
                                 /* converts val to a string;
 				 * caller must free the result */
   void (*delete_fn)(struct _owl_variable *v);
