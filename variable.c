@@ -5,8 +5,6 @@
 #include <ctype.h>
 #include "owl.h"
 
-int owl_variable_set_default(owl_variable *v, const GValue *newval);
-
 #define OWLVAR_BOOL(name,default,summary,description) \
   { g_strdup(name), OWL_VARIABLE_BOOL, NULL, default, "on,off", g_strdup(summary), g_strdup(description), {0}, {0}, \
         NULL, NULL, NULL, NULL, NULL, NULL }
@@ -990,9 +988,7 @@ const GValue *owl_variable_get_default(const owl_variable *v) {
   return &(v->val);
 }
 
-int owl_variable_set_default(owl_variable *v,
-                             const GValue *newval) 
-{
+int owl_variable_set_default(owl_variable *v, const GValue *newval) {
   if (v->validate_fn) {
     if (!v->validate_fn(v, newval)) return(-1);
   }
