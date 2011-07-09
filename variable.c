@@ -604,9 +604,6 @@ int owl_variable_dict_add_from_list(owl_vardict *vd, owl_variable *variables_to_
     cur->description = g_strdup(var->description);
     GValue value = {0};
     switch (cur->type) {
-      /*    case OWL_VARIABLE_OTHER:
-      cur->set_fn(cur, cur->pval_default);
-      break;*/
     case OWL_VARIABLE_STRING:
       if (!cur->validate_fn) {
         cur->validate_fn = owl_variable_string_validate_default;
@@ -903,10 +900,6 @@ const GValue *owl_variable_get(const owl_variable *v) {
   return v->get_fn(v);
 }
 
-/* returns a reference */
-/*const void *owl_variable_get_other(const owl_vardict *d, const char *name) {
-  return owl_variable_get(d,name, OWL_VARIABLE_OTHER);
-  }*/
 
 const char *owl_variable_get_string(const owl_variable *v)
 {
@@ -916,16 +909,6 @@ const char *owl_variable_get_string(const owl_variable *v)
   }
   return g_value_get_string(&(v->val));
 }
-
-/* returns a reference */
-/* const void *owl_variable_get_other(const owl_variable *v) */
-/* { */
-/*   if (owl_variable_get_type(v) != OWL_VARIABLE_OTHER) { */
-/*     owl_function_error("Variable '%s' is not type other.", owl_variable_get_name(v)); */
-/*     return NULL; */
-/*   } */
-/*   return owl_variable_get(v); */
-/* } */
 
 int owl_variable_get_int(const owl_variable *v)
 {
