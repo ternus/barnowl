@@ -111,8 +111,10 @@ sub read_config {
             warn "SSL parameters specified, but no client credentials set.";
         }
     } else {
-        $cfg{'ssl_verify'} = 0;
-        warn "SSL parameters not specified. WILL NOT VERIFY SERVER CERTIFICATE";
+	$cfg{'ssl_verify'} = 0;
+	my $msg = "SSL parameters not specified. WILL NOT VERIFY SERVER CERTIFICATE. See README for details.";
+	BarnOwl::admin_message('Zulip Warning', "Zulip: $msg");
+	warn $msg;
     }
     
     $cfg{'user'} = $user;
@@ -468,6 +470,9 @@ BarnOwl::new_command('zulip:unsubscribe' => sub { cmd_zulip_unsub(@_); },
                          description => "Unsubscribe to a Zulip stream"
                      });
 
+sub user {
+  return $cfg{'user'};
+}
 
 sub default_realm {
   return $cfg{'realm'};
