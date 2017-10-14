@@ -123,6 +123,38 @@ sub read_config {
     $cfg{'realm'} = $default_realm;
 }
 
+sub setup_presence_watcher {
+  # BarnOwl::admin_message("Setting up presence", "setting up presence");
+  BarnOwl::register_idle_watcher(name => "zulip_idle",
+                                 after => 300,
+                                 callback => sub {
+                                    my $status = @_[0];
+                                    my $presence_url = $cfg{'api_url'} . "/users/me/presence";
+                                    my %presence_params;
+                                    if ($status) {
+                                      %presence_params = (status => "active", new_user_input => "true");
+                                      } else {
+                                        %presence_params = (status => "idle", new_user_input => "true");
+                                      }
+                                      my $presence_body = POST($presence_url, \%presence_params)->content;
+                                      http_post($presence_url, $presence_body, headers => { "Authorization" => authorization,
+                                                "Content-Type" => "application/x-www-form-urlencoded" },
+                                                session => $tls_ctx,
+                                                sessionid => $tls_ctx,
+                                                tls_ctx => $tls_ctx,
+                                                sub {
+                                                  my ($body, $headers) = @_;
+                                                  if($headers->{Status} > 399) {
+                                                    warn("Error sending presence");
+                                                    warn(encode_json($headers));
+                                                    warn($body);
+                                                    }});
+                                      return;
+                                      });
+
+}
+
+
 sub register {
     my $retry_count = 0;
     my $callback;
@@ -154,23 +186,7 @@ sub register {
             } else {
                 $last_event_id = $response->{last_event_id};
                 $queue_id = $response->{queue_id};
-                $presence_timer = AnyEvent->timer(after => 1, interval => 60, cb => sub {
-                    my $presence_url = $cfg{'api_url'} . "/users/me/presence";
-                    my %presence_params = (status => "active", new_user_input => "true");
-                    my $presence_body = POST($presence_url, \%presence_params)->content;
-                    http_post($presence_url, $presence_body, headers => { "Authorization" => authorization,
-                                                                          "Content-Type" => "application/x-www-form-urlencoded" },
-                              session => $tls_ctx,
-                              sessionid => $tls_ctx,
-                              tls_ctx => $tls_ctx,
-                              sub {
-                                  my ($body, $headers) = @_;
-                                  if($headers->{Status} > 399) {
-                                      warn("Error sending presence");
-                                      warn(encode_json($headers));
-                                      warn($body);
-                                  }});
-                    return;});
+                BarnOwl::admin_message("Zulip", "Zulip: registered and receiving messages.");
                 do_poll();
                 return;
             }
@@ -426,6 +442,7 @@ sub cmd_zulip_getsubs {
 }
 
 sub cmd_zulip_login {
+    setup_presence_watcher();
     register();
 }
 
