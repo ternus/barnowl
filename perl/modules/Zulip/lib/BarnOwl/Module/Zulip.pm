@@ -12,6 +12,8 @@ our $retry_timer;
 our $tls_ctx;
 our %msg_id_map;
 our $presence_timer;
+our %zulip_users;
+our %zulip_subs;
 
 use AnyEvent;
 use AnyEvent::HTTP;
@@ -22,14 +24,20 @@ use URI;
 use URI::Encode;
 use BarnOwl::Hooks;
 use BarnOwl::Message::Zulip;
+use BarnOwl::Complete::Zulip;
 use HTTP::Request::Common;
 use Getopt::Long qw(GetOptionsFromArray);
+
+
+use base qw(Exporter);
+our @EXPORT_OK = qw(zulip_users zulip_subs);
 
 sub fail {
     my $msg = shift;
     undef %cfg;
     undef $queue_id;
     undef $last_event_id;
+    BarnOwl::unregister_idle_watcher($presence_timer);
 
     BarnOwl::admin_message('Zulip Error', $msg);
     die("Zulip Error: $msg\n");
@@ -124,8 +132,7 @@ sub read_config {
 }
 
 sub setup_presence_watcher {
-  # BarnOwl::admin_message("Setting up presence", "setting up presence");
-  BarnOwl::register_idle_watcher(name => "zulip_idle",
+  $presence_timer = BarnOwl::register_idle_watcher(name => "zulip_idle",
                                  after => 300,
                                  callback => sub {
                                     my $status = @_[0];
@@ -227,7 +234,6 @@ sub do_poll {
             if($retry_count >= $max_retries) {
                 warn "Retry count exceeded in do_poll, giving up";
                 fail("do_poll: Giving up");
-                $presence_timer->cancel;
             } else {
                 warn "Retrying";
                 $retry_count++;       
@@ -414,11 +420,30 @@ sub get_subs {
                      BarnOwl::debug($body);
                  }
                  my $data = decode_json($body);
-                 my @subs;
                  for my $s (@{$data->{subscriptions}}) {
-                     push @subs, $s->{name};
+                     $zulip_subs{$s->{name}} = 1;
                  }
-                 BarnOwl::popless_text(join "\n", @subs);
+                 # BarnOwl::popless_text(join "\n", @zulip_subs);
+             });
+    return;
+}
+
+
+sub get_users {
+   my $url = $cfg{'api_url'} . "/users";
+    http_get($url, headers => { "Authorization" => authorization },
+             session => $tls_ctx, sessionid => $tls_ctx,
+             tls_ctx => $tls_ctx, sub {
+                 my ($body, $headers) = @_;
+                 if ($headers->{Status} > 399) {
+                     BarnOwl::message("Error retrieving user list: $headers->{Reason}");
+                     BarnOwl::debug($body);
+                 }
+                 my $data = decode_json($body);
+                 for my $user (@{$data->{members}}) {
+                   $zulip_users{$user->{email}} = $user; 
+                 }
+                 # BarnOwl::popless_text(join "\n", %users);
              });
     return;
 }
@@ -441,8 +466,15 @@ sub cmd_zulip_getsubs {
     get_subs();
 }
 
+
+sub cmd_zulip_getusers {
+    get_users();
+}
+
 sub cmd_zulip_login {
     setup_presence_watcher();
+    get_subs();
+    get_users();
     register();
 }
 
